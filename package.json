@@ -1,5 +1,5 @@
 {
-  "name": "pipewrench_mod_template",
+  "name": "@sakuratears/pz-lib",
   "version": "1.0.0",
   "description": "",
   "watch": {
@@ -15,7 +15,7 @@
     "clean": "del-cli dist",
     "check": "prettier --check . && eslint .",
     "lint": "prettier --write . && eslint .",
-    "watch": "tstl --watch --outDir ~/Zomboid/mods"
+    "watch": "tstl --watch --outDir ./dist/"
   },
   "repository": {
     "type": "git",
@@ -50,7 +50,7 @@
     "typescript-to-lua": "^1.26.0"
   },
   "dependencies": {
-    "@asledgehammer/pipewrench": "41.78.16",
+    "@asledgehammer/pipewrench": "^41.78.16",
     "@asledgehammer/pipewrench-events": "^41.73.0",
     "fs-extra": "^10.1.0",
     "latest": "^0.2.0"
