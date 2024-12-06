@@ -5,6 +5,7 @@ import {
   isServer
 } from '@asledgehammer/pipewrench'
 import { onGameStart, onTickEvenPaused } from '@asledgehammer/pipewrench-events'
+import { nextRenderTick, nextTick } from '.'
 
 /**
  * 获取当前运行在哪端？
@@ -20,11 +21,11 @@ const getRunMode = () => {
   return 'sp'
 }
 
-type TaskPriority = 1 | 2 | 3 | 4 | 5
-type TaskExceptTpsLevel = 1 | 2 | 2 | 4 | 5 | 6
+export type TaskPriority = 1 | 2 | 3 | 4 | 5
+export type TaskExceptTpsLevel = 1 | 2 | 2 | 4 | 5 | 6
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface Task<T = any> {
+export interface Task<T = any> {
   /** 任务标识，重复标识的任务不会插入到任务队列中 */
   name: string
   /**
@@ -47,38 +48,41 @@ interface Task<T = any> {
   exceptTpsLevel?: TaskExceptTpsLevel
   /** 1-5, 5是最优先，默认值为 3，step 函数执行时间过长时，会根据超出的时间来降低该任务优先级 */
   priority?: TaskPriority
+  /** 任务结束时，finish 是否在 renderTick 执行，默认不在 renderTick 中执行 */
+  finishInRenderTick?: boolean
+  /** 任务执行时存储数据的地方 */
   data: T
   /**
    * 任务第一次执行前会调用 start 函数
    *
    * 尽可能保证该函数执行时间不超过任务最小执行时间(4ms)
    */
-  start?: () => void
+  start?: (data: T) => void
   /**
    * 返回值表示任务是否已完成，返回 true 时会中止任务执行并移除任务
    *
    * 尽可能保证该函数执行时间不超过任务最小执行时间(4ms)
    */
-  step: () => boolean
+  step: (data: T) => boolean
   /**
    * 在该次任务调度之后，执行该函数获取任务进度，返回进度百分比
    *
    * 需要该函数执行时间尽可能的小(不超过 1ms)
    */
-  progress: () => number
+  progress: (data: T) => number
   /**
-   * 任务完成时会调用 end 函数
+   * 任务完成时会调用 finish 函数
    *
    * 尽可能保证该函数执行时间不超过任务最小执行时间(4ms)
    */
-  end?: () => void
+  finish?: (data: T) => void
   /**
    * 任务执行报错时会执行该函数
    *
    * 尽可能保证该函数执行时间不超过任务最小执行时间(4ms)
    * @param err 抛出的错误
    */
-  error?: (err: unknown) => void
+  error?: (err: unknown, data: T) => void
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,8 +93,8 @@ interface TaskWrapper<T = any> {
   priority: TaskPriority
   progress: number
   started: boolean
+  executed: boolean
   finished: boolean
-  ended: boolean
 }
 
 const defaultTaskExceptTpsLevel = 1
@@ -144,14 +148,14 @@ const createTaskWrapper = (task: Task): TaskWrapper => {
     priority: 1,
     progress: 0,
     started: false,
-    finished: false,
-    ended: false
+    executed: false,
+    finished: false
   }
 }
 
 /** 从队列中移除任务 */
 const removeTaskWrap = (
-  taskQueue: TaskWrapper<Task<unknown>>[],
+  taskQueue: TaskWrapper<unknown>[],
   taskName: string
 ) => {
   const wrapperIndex = taskQueue.findIndex(
@@ -174,7 +178,7 @@ const getTpsComparisonTable = (minExecTime: number) => {
 }
 
 /** 获取优先级最高的任务 */
-const getMaxPriorityTaskWrapper = (taskQueue: TaskWrapper<Task<unknown>>[]) => {
+const getMaxPriorityTaskWrapper = (taskQueue: TaskWrapper<unknown>[]) => {
   return taskQueue.reduce(
     (nowTaskWrapper, taskWrapper) => {
       if (!nowTaskWrapper) {
@@ -192,12 +196,13 @@ const getMaxPriorityTaskWrapper = (taskQueue: TaskWrapper<Task<unknown>>[]) => {
 const runWithTaskErrorHappened = (
   error: unknown,
   taskWrapper: TaskWrapper,
-  taskQueue: TaskWrapper<Task<unknown>>[]
+  taskQueue: TaskWrapper<unknown>[]
 ) => {
+  const { task } = taskWrapper
   // 移除报错的任务，打断当前 tick 的执行，抛出错误
-  removeTaskWrap(taskQueue, taskWrapper.task.name)
-  if (typeof taskWrapper.task.error === 'function') {
-    taskWrapper.task.error(error)
+  removeTaskWrap(taskQueue, task.name)
+  if (typeof task.error === 'function') {
+    task.error(error, task.data)
   }
   throw error
 }
@@ -207,7 +212,7 @@ const runWithTaskErrorHappened = (
  * 执行的任务不太关心什么时候完成
  * @returns
  */
-const createLongTaskSchedulingManager = () => {
+export const createLongTaskSchedulingManager = () => {
   /** 当前 tick 执行的时间 */
   let latestTime = 0
   /** 当前 tps */
@@ -218,6 +223,8 @@ const createLongTaskSchedulingManager = () => {
   let remainingExecTime = 0
   /** 游戏是否暂停 */
   let gamePaused = true
+  /** 当前在执行的任务 */
+  let currentRunningTaskWrapper: TaskWrapper | undefined = void 0
   const taskQueue: TaskWrapper[] = []
 
   /** 任务最小执行时间，单位：ms */
@@ -280,9 +287,10 @@ const createLongTaskSchedulingManager = () => {
       }
       // 获取权重最高的 task
       const currentTaskWrapper = getMaxPriorityTaskWrapper(taskQueue)
+      currentRunningTaskWrapper = currentTaskWrapper
 
       /**
-       * 计算剩余任务执行时间
+       * 计算剩余的任务执行时间
        * @param taskWrapper
        * @returns {boolean} isUnexpired
        */
@@ -326,9 +334,10 @@ const createLongTaskSchedulingManager = () => {
 
           if (typeof task.start === 'function') {
             try {
-              task.start()
+              task.start(task.data)
               taskWrapper.started = true
             } catch (error) {
+              currentRunningTaskWrapper = void 0
               runWithTaskErrorHappened(error, taskWrapper, taskQueue)
               return
             }
@@ -340,18 +349,19 @@ const createLongTaskSchedulingManager = () => {
         }
 
         // task step stage
-        if (!taskWrapper.finished) {
+        if (!taskWrapper.executed) {
           let isFinished = false
           while (!isFinished) {
             try {
-              isFinished = task.step()
+              isFinished = task.step(task.data)
               if (!isFinished) {
-                taskWrapper.progress = task.progress() || 0
+                taskWrapper.progress = task.progress(task.data) || 0
               } else {
                 taskWrapper.progress = 100
-                taskWrapper.finished = true
+                taskWrapper.executed = true
               }
             } catch (error) {
+              currentRunningTaskWrapper = void 0
               runWithTaskErrorHappened(error, taskWrapper, taskQueue)
               return
             }
@@ -362,12 +372,24 @@ const createLongTaskSchedulingManager = () => {
           }
         }
 
-        // task end stage
-        if (typeof task.end === 'function') {
+        // task finish stage
+        if (typeof task.finish === 'function') {
           try {
-            task.end()
-            taskWrapper.ended = true
+            if (task.finishInRenderTick) {
+              nextRenderTick(() => {
+                task.finish && task.finish(task.data)
+                taskWrapper.finished = true
+              })
+            } else {
+              nextTick(() => {
+                task.finish && task.finish(task.data)
+                taskWrapper.finished = true
+              })
+            }
+            removeTaskWrap(taskQueue, task.name)
+            currentRunningTaskWrapper = void 0
           } catch (error) {
+            currentRunningTaskWrapper = void 0
             runWithTaskErrorHappened(error, taskWrapper, taskQueue)
             return
           }
@@ -376,6 +398,8 @@ const createLongTaskSchedulingManager = () => {
             return
           }
         }
+        currentRunningTaskWrapper = void 0
+
         runNextTask()
       }
 
@@ -384,26 +408,63 @@ const createLongTaskSchedulingManager = () => {
     runNextTask()
   }
 
+  const remove = (task: Task | string) => {
+    if (typeof task === 'string') {
+      removeTaskWrap(taskQueue, task)
+      return
+    }
+    removeTaskWrap(taskQueue, task.name)
+  }
+
   return {
     /** 插入任务，重复标识的任务不会插入到任务队列中 */
-    add(task: Task) {
+    add<T>(task: Task<T>) {
       if (taskQueue.some((taskWrap) => taskWrap.task.name === task.name)) {
         return
       }
       taskQueue.push(createTaskWrapper(task))
     },
-    remove(task: Task) {
-      removeTaskWrap(taskQueue, task.name)
-    },
+    remove,
     start() {
       onTickEvenPaused.addListener(tickListener)
     },
     stop() {
       latestTime = 0
       onTickEvenPaused.removeListener(tickListener)
+    },
+    /** 获取任务的对外暴露的包装 */
+    getPacking(taskName: string) {
+      const taskWrap = taskQueue.find(
+        (wrapper) => wrapper.task.name === taskName
+      )
+      if (!taskWrap) {
+        return
+      }
+      return {
+        task: taskWrap.task,
+        /** 是否在执行当前任务 */
+        isRunning() {
+          return (
+            currentRunningTaskWrapper &&
+            currentRunningTaskWrapper.task.name === taskWrap.task.name
+          )
+        },
+        /** 移除任务 */
+        remove() {
+          remove(taskWrap.task)
+        },
+        /** 获取任务执行进度 */
+        progress() {
+          return taskWrap.progress
+        }
+      }
     }
   }
 }
+
+
+
+// =================== 分割线 ====================
 
 const task: Task<{
   count: number
@@ -430,7 +491,7 @@ const task: Task<{
     print('progress')
     return this.data.count / 10
   },
-  end() {
+  finish() {
     print('finish')
   }
   // error(err) {},
