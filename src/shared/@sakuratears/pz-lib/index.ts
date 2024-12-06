@@ -1,6 +1,8 @@
 import {
   getSprite,
   InventoryItemFactory,
+  isClient,
+  isServer,
   type Texture,
   type zombie
 } from '@asledgehammer/pipewrench'
@@ -10,6 +12,20 @@ import { onRenderTick, onTick } from '@asledgehammer/pipewrench-events'
 const _getSpriteTexture = _G.getSpriteTexture as (
   sprite: zombie.iso.sprite.IsoSprite
 ) => Texture
+
+/**
+ * 获取当前运行在哪端？
+ * @returns sp 单人，client 多人客户端，server 多人服务端
+ */
+export const getRunMode = () => {
+  if (isClient()) {
+    return 'client'
+  }
+  if (isServer()) {
+    return 'server'
+  }
+  return 'sp'
+}
 
 /** 通过贴图名称获取贴图信息 */
 export const getTileInfoByName = (tileName: string) => {

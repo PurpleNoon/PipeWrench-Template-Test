@@ -1,25 +1,6 @@
-import {
-  getTimeInMillis,
-  isClient,
-  isGamePaused,
-  isServer
-} from '@asledgehammer/pipewrench'
+import { getTimeInMillis, isGamePaused } from '@asledgehammer/pipewrench'
 import { onGameStart, onTickEvenPaused } from '@asledgehammer/pipewrench-events'
-import { nextRenderTick, nextTick } from '.'
-
-/**
- * 获取当前运行在哪端？
- * @returns sp 单人，client 多人客户端，server 多人服务端
- */
-const getRunMode = () => {
-  if (isClient()) {
-    return 'client'
-  }
-  if (isServer()) {
-    return 'server'
-  }
-  return 'sp'
-}
+import { getRunMode, nextRenderTick, nextTick } from '.'
 
 export type TaskPriority = 1 | 2 | 3 | 4 | 5
 export type TaskExceptTpsLevel = 1 | 2 | 2 | 4 | 5 | 6
@@ -461,8 +442,6 @@ export const createLongTaskSchedulingManager = () => {
     }
   }
 }
-
-
 
 // =================== 分割线 ====================
 
