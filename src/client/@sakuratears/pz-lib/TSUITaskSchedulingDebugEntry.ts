@@ -9,18 +9,18 @@ import {
 import { everyTenMinutes, onResetLua } from '@asledgehammer/pipewrench-events'
 import type { UIKey } from '../../../shared/types'
 
-export class TaskSchedulingDebugEntry extends ISPanel {
-  static instance: TaskSchedulingDebugEntry | undefined
+export class TSUITaskSchedulingDebugEntry extends ISPanel {
+  static instance: TSUITaskSchedulingDebugEntry | undefined
 
   static mount() {
     const maxX = getCore().getScreenWidth()
     // const maxY = getCore().getScreenHeight()
     const uiX = maxX - 350
     const uiY = 10
-    const ui = new TaskSchedulingDebugEntry(uiX, uiY, 100, 100, getPlayer())
+    const ui = new TSUITaskSchedulingDebugEntry(uiX, uiY, 100, 100, getPlayer())
     ui.initialise()
     ui.addToUIManager()
-    TaskSchedulingDebugEntry.instance = ui
+    TSUITaskSchedulingDebugEntry.instance = ui
   }
 
   character: IsoPlayer
@@ -105,20 +105,20 @@ export class TaskSchedulingDebugEntry extends ISPanel {
 }
 
 const CheckDebuggerEntryUI = () => {
-  if (TaskSchedulingDebugEntry.instance) {
+  if (TSUITaskSchedulingDebugEntry.instance) {
     return
   }
-  TaskSchedulingDebugEntry.mount()
+  TSUITaskSchedulingDebugEntry.mount()
 }
 
 // 不确定好使不
 const debuggerEntryUIOnResetLua = () => {
-  if (!TaskSchedulingDebugEntry.instance) {
+  if (!TSUITaskSchedulingDebugEntry.instance) {
     return
   }
-  TaskSchedulingDebugEntry.instance.destroy()
-  TaskSchedulingDebugEntry.instance = void 0
-  TaskSchedulingDebugEntry.mount()
+  TSUITaskSchedulingDebugEntry.instance.destroy()
+  TSUITaskSchedulingDebugEntry.instance = void 0
+  TSUITaskSchedulingDebugEntry.mount()
 }
 
 everyTenMinutes.addListener(CheckDebuggerEntryUI)
