@@ -126,6 +126,7 @@ work with other mods?
   - 亦或者是弄成 bundle v x.x.x
   - 总会存在旧的 library
 全局变量声明
+mod 加载顺序，推荐 client 和 server 不要互相引用，都从 shared 中引用
 19. top class 换成 ISBaseObject？ISBaseObject 新增的内容怎么分享到 ts class
 20. [x] 原生 pz 类的 ____constructor 没处理
 21. 关于 pipeWrench 的版本号，提个 issues
