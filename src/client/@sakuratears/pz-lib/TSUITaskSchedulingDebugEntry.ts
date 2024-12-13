@@ -1,12 +1,15 @@
 import {
   getCore,
   getPlayer,
-  ISButton,
-  ISPanel,
   UIManager,
   type IsoPlayer,
 } from '@asledgehammer/pipewrench'
-import { everyTenMinutes, onResetLua } from '@asledgehammer/pipewrench-events'
+import { ISPanel, ISButton } from '@asledgehammer/pipewrench/client'
+import {
+  everyTenMinutes,
+  onGameStart,
+  onResetLua,
+} from '@asledgehammer/pipewrench-events'
 import type { UIKey } from '../../../shared/types'
 
 export class TSUITaskSchedulingDebugEntry extends ISPanel {
@@ -21,6 +24,7 @@ export class TSUITaskSchedulingDebugEntry extends ISPanel {
     ui.initialise()
     ui.addToUIManager()
     TSUITaskSchedulingDebugEntry.instance = ui
+    print(`ui instanceof ISPanel${ui instanceof ISPanel}`);
   }
 
   character: IsoPlayer
@@ -68,15 +72,15 @@ export class TSUITaskSchedulingDebugEntry extends ISPanel {
     const btnOpen: ISButton & UIKey = new ISButton(
       3,
       3,
-      this.width - 6,
-      this.height - 6,
-      void 0,
+      40,
+      24,
+      'btn',
       this,
       this.onClick,
       void 0,
       void 0,
     )
-    btnOpen.internal = ''
+    btnOpen.internal = 'test'
     btnOpen.anchorRight = true
     btnOpen.anchorBottom = true
     btnOpen.anchorTop = false
@@ -92,9 +96,10 @@ export class TSUITaskSchedulingDebugEntry extends ISPanel {
     return btnOpen
   }
 
-  onClick() // button: ISButton & UIKey
-  {
-    // button.internal
+  onClick(button: ISButton & UIKey) {
+    if (button.internal === 'test') {
+      print('test1')
+    }
   }
 
   destroy() {
@@ -121,5 +126,8 @@ const debuggerEntryUIOnResetLua = () => {
   TSUITaskSchedulingDebugEntry.mount()
 }
 
-everyTenMinutes.addListener(CheckDebuggerEntryUI)
-onResetLua.addListener(debuggerEntryUIOnResetLua)
+onGameStart.addListener(() => {
+  everyTenMinutes.addListener(CheckDebuggerEntryUI)
+  onResetLua.addListener(debuggerEntryUIOnResetLua)
+})
+
