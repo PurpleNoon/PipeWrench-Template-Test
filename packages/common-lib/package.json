@@ -1,0 +1,11 @@
+{
+  "name": "@sakuratears/common-lib",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./index",
+  "types": "./index",
+  "scripts": {},
+  "pzpw": {
+    "server": "test-server"
+  }
+}
