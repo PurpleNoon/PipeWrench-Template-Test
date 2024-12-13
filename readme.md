@@ -50,3 +50,8 @@ You should now have a _working_ environment.
 - `npm run clean`: Cleans the `media/lua` output Lua code.
 - `npm run compile`: Compiles `.ts` files from the `./src/` folder to `.lua` files in the output folder.
 - `npm run dev`: Runs a watcher, watching `.lua`, `.ts`, and `.d.ts` files.
+
+## 注意事项
+
+该项目是使用我个人本地的依赖，因此目前拉下来运行的话是会报错的
+This project is using my personal local dependency, so if I pull it down and run it now, there will be an error
