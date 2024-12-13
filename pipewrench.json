@@ -1,9 +1,9 @@
 {
   "modInfo": {
-    "name": "My First Mod",
+    "name": "sakuraMod1",
     "poster": "./poster.png",
     "description": "arf",
-    "id": "12312312",
+    "id": "sakuraMod1",
     "url": "https://www.google.com,"
   },
   "modelsDir": "./src/models",
