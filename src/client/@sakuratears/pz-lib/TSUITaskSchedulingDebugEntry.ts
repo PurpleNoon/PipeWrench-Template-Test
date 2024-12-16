@@ -11,6 +11,7 @@ import {
   onResetLua,
 } from '@asledgehammer/pipewrench-events'
 import type { UIKey } from '../../../shared/types'
+import { TSUITaskSchedulingDebugPanel } from './TSUITaskSchedulingDebugPanel'
 
 export class TSUITaskSchedulingDebugEntry extends ISPanel {
   static instance: TSUITaskSchedulingDebugEntry | undefined
@@ -24,11 +25,11 @@ export class TSUITaskSchedulingDebugEntry extends ISPanel {
     ui.initialise()
     ui.addToUIManager()
     TSUITaskSchedulingDebugEntry.instance = ui
-    print(`ui instanceof ISPanel${ui instanceof ISPanel}`);
   }
 
   character: IsoPlayer
   btnOpen?: ISButton & UIKey
+  debugPanel?: TSUITaskSchedulingDebugPanel
   constructor(
     x: number,
     y: number,
@@ -99,6 +100,8 @@ export class TSUITaskSchedulingDebugEntry extends ISPanel {
   onClick(button: ISButton & UIKey) {
     if (button.internal === 'test') {
       print('test1')
+      TSUITaskSchedulingDebugPanel.mount()
+      return
     }
   }
 
@@ -121,6 +124,7 @@ const debuggerEntryUIOnResetLua = () => {
   if (!TSUITaskSchedulingDebugEntry.instance) {
     return
   }
+  print('freshing DebuggerEntryUI')
   TSUITaskSchedulingDebugEntry.instance.destroy()
   TSUITaskSchedulingDebugEntry.instance = void 0
   TSUITaskSchedulingDebugEntry.mount()
@@ -130,4 +134,3 @@ onGameStart.addListener(() => {
   everyTenMinutes.addListener(CheckDebuggerEntryUI)
   onResetLua.addListener(debuggerEntryUIOnResetLua)
 })
-
