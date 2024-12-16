@@ -7,10 +7,10 @@ export { divide, nextTick, nextRenderTick } from './@sakuratears/pz-lib'
 enum Stage {
   tileGroupNamesIterating = 'tileGroupNamesIterating',
   tileGroupIterating = 'tileGroupIterating',
-  tileGroupIteratingCheck = 'tileGroupIteratingCheck'
+  tileGroupIteratingCheck = 'tileGroupIteratingCheck',
 }
 
-interface TileItem {
+export interface TileItem {
   name: string
   item: {
     groupName: string
@@ -25,11 +25,16 @@ interface TileItem {
   tooltip: string
 }
 
+export interface TaskFinishData {
+  allTiles: TileItem[]
+  allTileGroupMap: Record<string, TileItem[]>
+}
+
 export const createCollectTexturesTask = (
   cb: (data: {
     allTiles: TileItem[]
     allTileGroupMap: Record<string, TileItem[]>
-  }) => void
+  }) => void,
 ) => {
   const data = {
     allTiles: [] as TileItem[],
@@ -42,7 +47,7 @@ export const createCollectTexturesTask = (
 
     tileGroup: void 0 as unknown as java.util.ArrayList<string>,
     tileGroupTotal: 0,
-    tileGroupIndex: 0
+    tileGroupIndex: 0,
   }
   const task: Task<typeof data> = {
     name: 'collectTexturesTask',
@@ -56,10 +61,10 @@ export const createCollectTexturesTask = (
     step(data) {
       if (data.stage === Stage.tileGroupNamesIterating) {
         const groupName = data.tileGroupNames.get(
-          data.tileGroupNamesIndex
+          data.tileGroupNamesIndex,
         ) as string
         data.tileGroup = getWorld().getAllTiles(
-          groupName
+          groupName,
         ) as java.util.ArrayList<string>
         data.allTileGroupMap[groupName] = []
         data.tileGroupTotal = data.tileGroup.size()
@@ -71,11 +76,11 @@ export const createCollectTexturesTask = (
       if (data.stage === Stage.tileGroupIterating) {
         const tileName = data.tileGroup.get(data.tileGroupIndex)
         const groupName = data.tileGroupNames.get(
-          data.tileGroupNamesIndex
+          data.tileGroupNamesIndex,
         ) as string
         const tile = {
           ...getTileInfoByName(tileName),
-          groupName
+          groupName,
         }
         if (tile.IsMoveAble && tile.texture && !tile.CanBreak) {
           let tooltip = tile.displayName
@@ -91,7 +96,7 @@ export const createCollectTexturesTask = (
           const it = {
             name: tile.name,
             item: tile,
-            tooltip
+            tooltip,
           }
           data.allTiles.push(it)
           data.allTileGroupMap[groupName].push(it)
@@ -123,7 +128,7 @@ export const createCollectTexturesTask = (
       tileGroupNamesIndex,
       tileGroupNamesTotal,
       tileGroupIndex,
-      tileGroupTotal
+      tileGroupTotal,
     }) {
       // 使用 divide 避免除 0 导致出问题
       const baseProgress = divide(tileGroupNamesIndex, tileGroupNamesTotal)
@@ -133,9 +138,9 @@ export const createCollectTexturesTask = (
     finish(data) {
       cb({
         allTiles: data.allTiles,
-        allTileGroupMap: data.allTileGroupMap
+        allTileGroupMap: data.allTileGroupMap,
       })
-    }
+    },
     // error(err, data) {}
   }
   return task
