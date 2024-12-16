@@ -4,13 +4,13 @@ import {
   isClient,
   isServer,
   type Texture,
-  type zombie
+  type zombie,
 } from '@asledgehammer/pipewrench'
 import { onRenderTick, onTick } from '@asledgehammer/pipewrench-events'
 
 // @ts-expect-error 暂时添加缺失声明的全局函数
 const _getSpriteTexture = _G.getSpriteTexture as (
-  sprite: zombie.iso.sprite.IsoSprite
+  sprite: zombie.iso.sprite.IsoSprite,
 ) => Texture
 
 /**
@@ -38,7 +38,7 @@ export const getTileInfoByName = (tileName: string) => {
   const FreezerCapacity = props.Val('FreezerCapacity')
   const customItem = props.Val('CustomItem')
   const item = InventoryItemFactory.CreateItem(
-    customItem || `Moveables.${tileName}`
+    customItem || `Moveables.${tileName}`,
   )
   const displayName = item?.getDisplayName() || ''
   const Capacity = ContainerCapacity || FreezerCapacity || ''
@@ -49,7 +49,7 @@ export const getTileInfoByName = (tileName: string) => {
     IsMoveAble,
     CanBreak: props.Is('CanBreak'),
     PickUpWeight,
-    Capacity
+    Capacity,
   }
 }
 

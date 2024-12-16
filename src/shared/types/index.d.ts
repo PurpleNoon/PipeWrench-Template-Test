@@ -1,4 +1,4 @@
-import type { LongTaskSchedulingManager } from "../@sakuratears/pz-lib/longTaskScheduling"
+import type { LongTaskSchedulingManager } from '../@sakuratears/pz-lib/longTaskScheduling'
 
 export interface UIKey {
   internal?: string
