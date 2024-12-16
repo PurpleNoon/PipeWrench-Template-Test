@@ -72,6 +72,7 @@ interface TaskWrapper<T = any> {
   exceptTpsLevel: TaskExceptTpsLevel
   exceptTps: number
   priority: TaskPriority
+  startTime: number
   progress: number
   started: boolean
   executed: boolean
@@ -127,6 +128,7 @@ const createTaskWrapper = (task: Task): TaskWrapper => {
     exceptTpsLevel: 1,
     exceptTps: 60,
     priority: 1,
+    startTime: -1,
     progress: 0,
     started: false,
     executed: false,
@@ -302,6 +304,7 @@ export const createLongTaskSchedulingManager = () => {
 
         // task start stage
         if (!taskWrapper.started) {
+          taskWrapper.startTime = getTimeInMillis()
           taskWrapper.progress = 0
           taskWrapper.priority = task.priority || defaultTaskPriority
           taskWrapper.exceptTpsLevel =
