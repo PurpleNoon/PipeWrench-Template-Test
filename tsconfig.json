@@ -11,6 +11,7 @@
     "target": "ESNext",
     "types": [
       "lua-types/5.1",
+      "@typescript-to-lua/language-extensions",
       "@asledgehammer/pipewrench",
       "@asledgehammer/pipewrench-events"
     ]
