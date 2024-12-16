@@ -67,16 +67,38 @@ export interface Task<T = any> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface TaskWrapper<T = any> {
+export interface TaskWrapper<T = any> {
   task: Task<T>
   exceptTpsLevel: TaskExceptTpsLevel
   exceptTps: number
   priority: TaskPriority
   startTime: number
+  endTime: number
   progress: number
   started: boolean
   executed: boolean
   finished: boolean
+}
+
+export interface LongTaskSchedulingManager {
+  add<T>(task: Task<T>): void
+  remove(task: Task | string): void
+  start(): void
+  stop(): void
+  stop(): void
+  getPacking(taskName: string):
+    | {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        task: Task<any>
+        isRunning(): boolean | undefined
+        remove(): void
+        progress(): number
+      }
+    | undefined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getTaskQueue(): TaskWrapper<any>[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getCurrentRunningTaskWrapper(): TaskWrapper<any> | undefined
 }
 
 const defaultTaskExceptTpsLevel = 1
@@ -89,7 +111,7 @@ const clientExceptTpsMap = {
   3: 30,
   4: 15,
   5: 10,
-  6: 5
+  6: 5,
 }
 
 /** 服务端期望 tps 级别与期望 tps 对照表 */
@@ -99,7 +121,7 @@ const serverExceptTpsMap = {
   3: 10,
   4: 5,
   5: 3,
-  6: 1
+  6: 1,
 }
 
 /** 根据期望 tps 级别获取期望 tps */
@@ -129,20 +151,21 @@ const createTaskWrapper = (task: Task): TaskWrapper => {
     exceptTps: 60,
     priority: 1,
     startTime: -1,
+    endTime: -1,
     progress: 0,
     started: false,
     executed: false,
-    finished: false
+    finished: false,
   }
 }
 
 /** 从队列中移除任务 */
 const removeTaskWrap = (
   taskQueue: TaskWrapper<unknown>[],
-  taskName: string
+  taskName: string,
 ) => {
   const wrapperIndex = taskQueue.findIndex(
-    (wrapper) => wrapper.task.name === taskName
+    (wrapper) => wrapper.task.name === taskName,
   )
   if (wrapperIndex > -1) {
     taskQueue.splice(wrapperIndex, 1)
@@ -155,7 +178,7 @@ const getTpsComparisonTable = (minExecTime: number) => {
     (exceptTps) => {
       const neededRuntimeTps = 1000 / (1000 / exceptTps - minExecTime)
       return [exceptTps, neededRuntimeTps]
-    }
+    },
   )
   return list
 }
@@ -171,7 +194,7 @@ const getMaxPriorityTaskWrapper = (taskQueue: TaskWrapper<unknown>[]) => {
         ? taskWrapper
         : nowTaskWrapper
     },
-    void 0 as TaskWrapper | undefined
+    void 0 as TaskWrapper | undefined,
   )!
 }
 
@@ -179,9 +202,10 @@ const getMaxPriorityTaskWrapper = (taskQueue: TaskWrapper<unknown>[]) => {
 const runWithTaskErrorHappened = (
   error: unknown,
   taskWrapper: TaskWrapper,
-  taskQueue: TaskWrapper<unknown>[]
+  taskQueue: TaskWrapper<unknown>[],
 ) => {
   const { task } = taskWrapper
+  taskWrapper.endTime = getTimeInMillis()
   // 移除报错的任务，打断当前 tick 的执行，抛出错误
   removeTaskWrap(taskQueue, task.name)
   if (typeof task.error === 'function') {
@@ -284,13 +308,13 @@ export const createLongTaskSchedulingManager = () => {
           // 计算超时情况，超时情况严重时降低权重(最低权重时无法降低)
           if (remainingExecTime < 0 && taskWrapper.priority > 1) {
             const timeoutLevel = Math.floor(
-              Math.abs(remainingExecTime) / minExecTime
+              Math.abs(remainingExecTime) / minExecTime,
             )
             if (timeoutLevel > 0) {
               // 每超一倍的 minExecTime，降低一级优先级
               taskWrapper.priority = Math.max(
                 taskWrapper.priority - timeoutLevel,
-                1
+                1,
               ) as TaskPriority
             }
           }
@@ -370,6 +394,7 @@ export const createLongTaskSchedulingManager = () => {
                 taskWrapper.finished = true
               })
             }
+            currentRunningTaskWrapper!.endTime = getTimeInMillis()
             removeTaskWrap(taskQueue, task.name)
             currentRunningTaskWrapper = void 0
           } catch (error) {
@@ -419,7 +444,7 @@ export const createLongTaskSchedulingManager = () => {
     /** 获取任务的对外暴露的包装 */
     getPacking(taskName: string) {
       const taskWrap = taskQueue.find(
-        (wrapper) => wrapper.task.name === taskName
+        (wrapper) => wrapper.task.name === taskName,
       )
       if (!taskWrap) {
         return
@@ -440,9 +465,15 @@ export const createLongTaskSchedulingManager = () => {
         /** 获取任务执行进度 */
         progress() {
           return taskWrap.progress
-        }
+        },
       }
-    }
+    },
+    getTaskQueue() {
+      return taskQueue
+    },
+    getCurrentRunningTaskWrapper() {
+      return currentRunningTaskWrapper
+    },
   }
 }
 
@@ -455,7 +486,7 @@ const task: Task<{
   exceptTpsLevel: 1,
   priority: 3,
   data: {
-    count: 0
+    count: 0,
   },
   start() {
     print('start')
@@ -475,11 +506,11 @@ const task: Task<{
   },
   finish() {
     print('finish')
-  }
+  },
   // error(err) {},
 }
 
-const longTaskSchedulingManager = createLongTaskSchedulingManager()
+longTaskSchedulingManager = createLongTaskSchedulingManager()
 
 // 使用
 onGameStart.addListener(() => {
