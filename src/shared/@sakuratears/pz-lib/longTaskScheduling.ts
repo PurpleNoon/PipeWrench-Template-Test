@@ -101,6 +101,10 @@ export interface LongTaskSchedulingContext {
   taskQueue: TaskWrapper[]
   /** 任务最小执行时间，单位：ms */
   minExecTime: number
+  /** tps 补偿时间 */
+  tpsCompensationTime: number
+  /** 执行情况的队列，循环队列 */
+  executionStatusQueue: ExecutionStatusQueue
 }
 
 export interface LongTaskSchedulingManager {
@@ -218,23 +222,69 @@ const getMaxPriorityTaskWrapper = (taskQueue: TaskWrapper<unknown>[]) => {
         : nowTaskWrapper
     },
     void 0 as TaskWrapper | undefined,
-  )!
+  )
+}
+
+/**
+ * 计算剩余的任务执行时间
+ * @param taskWrapper
+ * @returns {boolean} isUnexpired
+ */
+const calcRemainingExecTime = (
+  taskWrapper: TaskWrapper,
+  context: LongTaskSchedulingContext,
+) => {
+  context.remainingExecTime =
+    context.currentTickRemainingExecTime -
+    (getTimeInMillis() - context.latestTime)
+  if (context.remainingExecTime <= 1) {
+    // 存储 tps 补偿时间
+    context.tpsCompensationTime = context.remainingExecTime
+    // 计算超时情况，超时情况严重时降低权重(最低权重时无法降低)
+    if (context.remainingExecTime < 0 && taskWrapper.priority > 1) {
+      const timeoutLevel = Math.floor(
+        Math.abs(context.remainingExecTime) / context.minExecTime,
+      )
+      if (timeoutLevel > 0) {
+        // 每超一倍的 minExecTime，降低一级优先级
+        taskWrapper.priority = Math.max(
+          taskWrapper.priority - timeoutLevel,
+          1,
+        ) as TaskPriority
+      }
+    }
+    return false
+  }
+  return true
 }
 
 /** 处理任务报错 */
 const runWithTaskErrorHappened = (
   error: unknown,
   taskWrapper: TaskWrapper,
-  taskQueue: TaskWrapper<unknown>[],
+  context: LongTaskSchedulingContext,
 ) => {
+  const { taskQueue } = context
   const { task } = taskWrapper
   taskWrapper.endTime = getTimeInMillis()
+  calcRemainingExecTime(taskWrapper, context)
   // 移除报错的任务，打断当前 tick 的执行，抛出错误
   removeTaskWrap(taskQueue, task.name)
+  context.currentRunningTaskWrapper = void 0
   if (typeof task.error === 'function') {
     task.error(error, task.data)
   }
   throw error
+}
+
+/** 执行情况的队列，循环队列 */
+class ExecutionStatusQueue {
+  queue: number[]
+
+  constructor() {
+    const queueCount = 10
+    this.queue = ([] as number[]).fill(0, 0, queueCount)
+  }
 }
 
 /**
@@ -252,6 +302,8 @@ export const createLongTaskSchedulingManager = () => {
     currentRunningTaskWrapper: void 0,
     taskQueue: [],
     minExecTime: 4,
+    tpsCompensationTime: 0,
+    executionStatusQueue: new ExecutionStatusQueue(),
   }
 
   /**
@@ -263,12 +315,27 @@ export const createLongTaskSchedulingManager = () => {
    */
   const tpsComparisonTable = getTpsComparisonTable(context.minExecTime)
 
+  // tps 补偿逻辑
+
+  // 问题：
+  // 当前的判断方式会导致 tps 一路降低而非稳定在指定的 tps 附近，
+  // 需要有补偿机制，需要考虑任务超时降级导致任务切换的情况
+
+  // 实现：
+  // 假设期望 60tps, 且 tps 为 100
+  // 记录该 tps，任务开始执行，tps 补偿偏移为 0
+  // 下一次调度，执行 1000/60-1000/100 ms，记录 tps 补偿偏移，可能为正可能为负
+  // 下一次调度，可用时间为 理论可用时间 + tps 补偿偏移，若可用时间为正，正常执行，若可用时间为负，跳过执行
+  // （理论上，任务调度执行正常时，造成 tps 波动幅度较小）
+  // 直至执行完成
+
+  // TODO: 考虑 tps 持续低于 期望 60tps 的一定值的情况
+  // 若连续一段时间（暂定为 10s）执行机会小于指定次数（暂定为 10 次），重新调整预期 tps
+  // 使用循环队列优化计算
+
   /**
    * 选取合适的用来执行任务的期望 tps
    * 当前 tps 大于期望 tps 时，使用大于当前 tps 且最接近当前 tps 级别的 tps
-   * TODO: 问题：
-   * 当前的判断方式会导致 tps 一路降低而非稳定在指定的 tps 附近，
-   * 需要有补偿机制，需要考虑任务超时降级导致任务切换的情况
    * @param exceptTps 期望的 tps
    * @param tps 当前 tps
    * @returns
@@ -285,7 +352,6 @@ export const createLongTaskSchedulingManager = () => {
   }
 
   const tickListener = () => {
-    // numberTicks: number
     const prevGamePaused = context.gamePaused
     context.gamePaused = isGamePaused()
     // 暂停时清空 tps 计时
@@ -303,6 +369,10 @@ export const createLongTaskSchedulingManager = () => {
       return
     }
     context.tps = Math.floor(1000 / (context.latestTime - now))
+    // 设置 tps 补偿时间
+    context.currentTickRemainingExecTime = context.tpsCompensationTime
+    context.tpsCompensationTime = 0
+
     // 任务的执行策略
     // 权重，串行（期望尽可能快的减少任务）
     const runNextTask = () => {
@@ -311,40 +381,18 @@ export const createLongTaskSchedulingManager = () => {
       }
       // 获取权重最高的 task
       const currentTaskWrapper = getMaxPriorityTaskWrapper(context.taskQueue)
-      context.currentRunningTaskWrapper = currentTaskWrapper
-
-      /**
-       * 计算剩余的任务执行时间
-       * @param taskWrapper
-       * @returns {boolean} isUnexpired
-       */
-      const calcRemainingExecTime = (taskWrapper: TaskWrapper) => {
-        context.remainingExecTime =
-          context.currentTickRemainingExecTime -
-          (getTimeInMillis() - context.latestTime)
-        if (context.remainingExecTime <= 1) {
-          // 计算超时情况，超时情况严重时降低权重(最低权重时无法降低)
-          if (context.remainingExecTime < 0 && taskWrapper.priority > 1) {
-            const timeoutLevel = Math.floor(
-              Math.abs(context.remainingExecTime) / context.minExecTime,
-            )
-            if (timeoutLevel > 0) {
-              // 每超一倍的 minExecTime，降低一级优先级
-              taskWrapper.priority = Math.max(
-                taskWrapper.priority - timeoutLevel,
-                1,
-              ) as TaskPriority
-            }
-          }
-          return false
-        }
-        return true
+      // 当前无任务
+      if (!currentTaskWrapper) {
+        context.currentTickRemainingExecTime = 0
+        context.remainingExecTime = 0
+        context.tpsCompensationTime = 0
+        return
       }
+      context.currentRunningTaskWrapper = currentTaskWrapper
 
       const runTask = (taskWrapper: TaskWrapper) => {
         const task = taskWrapper.task
 
-        // task start stage
         if (!taskWrapper.started) {
           taskWrapper.startTime = getTimeInMillis()
           taskWrapper.progress = 0
@@ -352,30 +400,44 @@ export const createLongTaskSchedulingManager = () => {
           taskWrapper.exceptTpsLevel =
             task.exceptTpsLevel || defaultTaskExceptTpsLevel
           taskWrapper.exceptTps = getExceptTps(task)
-          const finalExceptTps = getFinalExceptTps(
-            taskWrapper.exceptTps,
-            context.tps,
-          )
-          // 期望 tps 小于等于 1tps 时，固定执行 100ms
-          context.currentTickRemainingExecTime =
-            finalExceptTps > 1
-              ? 1000 / finalExceptTps - 1000 / context.tps
-              : 100
-          context.remainingExecTime = context.currentTickRemainingExecTime
+        }
 
+        const finalExceptTps = getFinalExceptTps(
+          taskWrapper.exceptTps,
+          context.tps,
+        )
+        // 期望 tps 小于等于 1tps 时，固定执行 100ms
+        // 加上 tps 补偿时间
+        const taskExecTimeInATick =
+          finalExceptTps > 1 ? 1000 / finalExceptTps - 1000 / context.tps : 100
+        // 假设根据期望 tps，得出原本可用 10ms，
+        // 任务执行用了 3ms，执行完成，还剩 7ms，然后执行下一个任务，
+        // 根据新任务的期望 tps，得出可用 20ms，
+        // 那当前剩余可用时间为 20ms - 3ms = 17ms
+        context.currentTickRemainingExecTime +=
+          taskExecTimeInATick - (getTimeInMillis() - context.latestTime)
+        context.remainingExecTime = context.currentTickRemainingExecTime
+        // 任务改变后或被 tps 补偿时间抵消，导致剩余时间不足，跳过当前 tick
+        if (context.remainingExecTime <= 0) {
+          return
+        }
+
+        // task start stage
+        if (!taskWrapper.started) {
           if (typeof task.start === 'function') {
             try {
               task.start(task.data)
               taskWrapper.started = true
             } catch (error) {
-              context.currentRunningTaskWrapper = void 0
-              runWithTaskErrorHappened(error, taskWrapper, context.taskQueue)
+              runWithTaskErrorHappened(error, taskWrapper, context)
               return
             }
-            const isStartUnexpired = calcRemainingExecTime(taskWrapper)
+            const isStartUnexpired = calcRemainingExecTime(taskWrapper, context)
             if (!isStartUnexpired) {
               return
             }
+          } else {
+            taskWrapper.started = true
           }
         }
 
@@ -392,11 +454,10 @@ export const createLongTaskSchedulingManager = () => {
                 taskWrapper.executed = true
               }
             } catch (error) {
-              context.currentRunningTaskWrapper = void 0
-              runWithTaskErrorHappened(error, taskWrapper, context.taskQueue)
+              runWithTaskErrorHappened(error, taskWrapper, context)
               return
             }
-            const isStepUnexpired = calcRemainingExecTime(taskWrapper)
+            const isStepUnexpired = calcRemainingExecTime(taskWrapper, context)
             if (!isStepUnexpired) {
               return
             }
@@ -417,18 +478,20 @@ export const createLongTaskSchedulingManager = () => {
                 taskWrapper.finished = true
               })
             }
-            context.currentRunningTaskWrapper!.endTime = getTimeInMillis()
+            taskWrapper.endTime = getTimeInMillis()
             removeTaskWrap(context.taskQueue, task.name)
             context.currentRunningTaskWrapper = void 0
           } catch (error) {
-            context.currentRunningTaskWrapper = void 0
-            runWithTaskErrorHappened(error, taskWrapper, context.taskQueue)
+            runWithTaskErrorHappened(error, taskWrapper, context)
             return
           }
-          const isEndUnexpired = calcRemainingExecTime(taskWrapper)
+          const isEndUnexpired = calcRemainingExecTime(taskWrapper, context)
           if (!isEndUnexpired) {
             return
           }
+        } else {
+          taskWrapper.finished = true
+          taskWrapper.endTime = getTimeInMillis()
         }
         context.currentRunningTaskWrapper = void 0
 
