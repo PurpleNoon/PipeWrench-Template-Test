@@ -14,9 +14,10 @@ import {
   type ISUIElement,
 } from '@asledgehammer/pipewrench/client'
 import type { UIKey } from '../../../shared/types'
-import type {
-  LongTaskSchedulingManager,
-  TaskWrapper,
+import {
+  longTaskSchedulingManager,
+  type LongTaskSchedulingManager,
+  type TaskWrapper,
 } from '../../../shared/@sakuratears/pz-lib/longTaskScheduling'
 import {
   createCollectTexturesTask,
@@ -42,29 +43,31 @@ import {
 // 优先级
 // 期望 tps
 
-function screenCenterOf(w: number, h: number) {
-  const screenWidth = getCore().getScreenWidth()
-  const screenHeight = getCore().getScreenHeight()
-  // return [(screenWidth - w) / 2, (screenHeight - h) / 2]
-  return $multi((screenWidth - w) / 2, (screenHeight - h) / 2)
-}
+// function screenCenterOf(w: number, h: number) {
+//   const screenWidth = getCore().getScreenWidth()
+//   const screenHeight = getCore().getScreenHeight()
+//   // return [(screenWidth - w) / 2, (screenHeight - h) / 2]
+//   return $multi((screenWidth - w) / 2, (screenHeight - h) / 2)
+// }
 
 export class TSUITaskSchedulingDebugPanel extends ISPanel {
   static instance?: TSUITaskSchedulingDebugPanel
 
   static mount() {
-    if (TSUITaskSchedulingDebugPanel.instance) {
-      return
-    }
-    const debugPanelWidth = 1000
-    const debugPanelHeight = 750
-    const [debugPanelX, debugPanelY] = screenCenterOf(
-      debugPanelWidth,
-      debugPanelHeight,
-    )
+    // if (TSUITaskSchedulingDebugPanel.instance) {
+    //   return
+    // }
+    const screenWidth = getCore().getScreenWidth()
+    const screenHeight = getCore().getScreenHeight()
+    const debugPanelWidth = 240
+    const debugPanelHeight = 300
+    // const [debugPanelX, debugPanelY] = screenCenterOf(
+    //   debugPanelWidth,
+    //   debugPanelHeight,
+    // )
     const debugPanel = new TSUITaskSchedulingDebugPanel(
-      debugPanelX,
-      debugPanelY,
+      (screenWidth - debugPanelWidth) / 2,
+      (screenHeight - debugPanelHeight) / 2,
       debugPanelWidth,
       debugPanelHeight,
       getPlayer(),
@@ -85,12 +88,17 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
   taskManager: LongTaskSchedulingManager
 
   // uis: ISUIElement[] = []
-  currentHeight: number = 0
+  currentHeight: number = 6
+  currentLeft: number = 6
   labelRgba: [number, number, number, number] = [1, 1, 1, 1]
 
   insertTaskBtn?: ISButton & UIKey
   closeBtn?: ISButton & UIKey
   taskCountLabel?: ISLabel
+  taskTpsLabel?: ISLabel
+  taskLatestTimeLabel?: ISLabel
+  taskGamePausedLabel?: ISLabel
+
   currentTaskNameLabel?: ISLabel
   currentTaskStageLabel?: ISLabel
   currentTaskProgressLabel?: ISLabel
@@ -115,7 +123,7 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
       r: 0,
       g: 0,
       b: 0,
-      a: 0,
+      a: 0.5,
     }
     this.borderColor = {
       r: 0,
@@ -140,12 +148,15 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
 
   resetLineSimple() {
     // this.uis = []
-    this.currentHeight = 0
+    this.currentHeight = 6
   }
 
   addLineSimple(comp: ISUIElement) {
     // this.uis.push(comp)
-    this.currentHeight += comp.getHeight()
+    comp.initialise()
+    comp.instantiate()
+    this.addChild(comp)
+    this.currentHeight += comp.getHeight() + 4
   }
 
   createLabelSimple(
@@ -154,7 +165,7 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     bLeft: boolean = true,
   ) {
     return new ISLabel(
-      0,
+      this.currentLeft,
       this.currentHeight,
       this.fontHeight,
       name,
@@ -169,13 +180,22 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
 
     // 信息总览
 
+    // 任务数
     const taskCountLabel = this.createLabelSimple(`task count: 0`)
-    taskCountLabel.instantiate()
     this.addLineSimple(taskCountLabel)
     this.taskCountLabel = taskCountLabel
 
+    // 当前 tps
+    const taskTpsLabel = this.createLabelSimple(`tps: 0`)
+    this.addLineSimple(taskTpsLabel)
+    this.taskTpsLabel = taskTpsLabel
+
+    // 游戏是否暂停
+    const taskGamePausedLabel = this.createLabelSimple(`gamePaused: false`)
+    this.addLineSimple(taskGamePausedLabel)
+    this.taskGamePausedLabel = taskGamePausedLabel
+
     const insertTaskBtn = this.createInsertTaskBtn()
-    insertTaskBtn.instantiate()
     this.addLineSimple(insertTaskBtn)
     this.insertTaskBtn = insertTaskBtn
 
@@ -183,37 +203,31 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
 
     // name
     const currentTaskNameLabel = this.createLabelSimple(`name: 0`)
-    currentTaskNameLabel.instantiate()
     this.addLineSimple(currentTaskNameLabel)
     this.currentTaskNameLabel = currentTaskNameLabel
 
     // 阶段
     const currentTaskStageLabel = this.createLabelSimple(`stage: 0`)
-    currentTaskStageLabel.instantiate()
     this.addLineSimple(currentTaskStageLabel)
     this.currentTaskStageLabel = currentTaskStageLabel
 
     // 进度
     const currentTaskProgressLabel = this.createLabelSimple(`progress: 0`)
-    currentTaskProgressLabel.instantiate()
     this.addLineSimple(currentTaskProgressLabel)
     this.currentTaskProgressLabel = currentTaskProgressLabel
 
     // 已持续时间
     const currentTaskDurationLabel = this.createLabelSimple(`duration: 0`)
-    currentTaskDurationLabel.instantiate()
     this.addLineSimple(currentTaskDurationLabel)
     this.currentTaskDurationLabel = currentTaskDurationLabel
 
     // 期望 tps
     const currentTaskExceptTpsLabel = this.createLabelSimple(`exceptTps: 0`)
-    currentTaskExceptTpsLabel.instantiate()
     this.addLineSimple(currentTaskExceptTpsLabel)
     this.currentTaskExceptTpsLabel = currentTaskExceptTpsLabel
 
     // 优先级
     const currentTaskPriorityLabel = this.createLabelSimple(`priority: 0`)
-    currentTaskPriorityLabel.instantiate()
     this.addLineSimple(currentTaskPriorityLabel)
     this.currentTaskPriorityLabel = currentTaskPriorityLabel
 
@@ -221,14 +235,13 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
 
     // 关闭按钮
     const closeBtn = this.createCloseBtn()
-    closeBtn.instantiate()
     this.addLineSimple(closeBtn)
     this.closeBtn = closeBtn
   }
 
   getStage(taskWrap?: TaskWrapper) {
     if (!taskWrap) {
-      return 'Not Running'
+      return 'No taskWrap'
     }
     if (taskWrap.finished) {
       return 'Finished'
@@ -255,14 +268,19 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
 
   update() {
     const taskQueue = this.taskManager.getTaskQueue()
+    const managerContext = this.taskManager.getContext()
     this.taskCountLabel?.setName(`task count: ${taskQueue.length}`)
+    this.taskTpsLabel?.setName(`tps ${managerContext.tps}`)
+    this.taskGamePausedLabel?.setName(
+      `gamePaused: ${managerContext.gamePaused}`,
+    )
 
     const taskWrap = this.taskManager.getCurrentRunningTaskWrapper()
     const task = taskWrap?.task
     this.currentTaskNameLabel?.setName(`name: ${task?.name || '-'}`)
     this.currentTaskStageLabel?.setName(`stage: ${this.getStage(taskWrap)}`)
     this.currentTaskProgressLabel?.setName(
-      `progress: ${taskWrap?.progress || '-'}`,
+      `progress: ${taskWrap?.progress.toFixed(2) || '-'}`,
     )
     this.currentTaskDurationLabel?.setName(
       `duration: ${this.getDuration(taskWrap)}`,
@@ -277,8 +295,8 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
 
   createCloseBtn() {
     const closeBtn: ISButton & UIKey = new ISButton(
-      3,
-      3,
+      this.currentLeft,
+      this.currentHeight,
       40,
       24,
       'close',
@@ -309,8 +327,8 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
 
   createInsertTaskBtn() {
     const closeBtn: ISButton & UIKey = new ISButton(
-      3,
-      3,
+      this.currentLeft,
+      this.currentHeight,
       40,
       24,
       'insert task',
@@ -346,6 +364,7 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
 
   init() {
     this.initialise()
+    // this.instantiate()
     this.setVisible(true)
     this.addToUIManager()
   }

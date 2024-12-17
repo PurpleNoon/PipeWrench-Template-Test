@@ -14,7 +14,7 @@ import type { UIKey } from '../../../shared/types'
 import { TSUITaskSchedulingDebugPanel } from './TSUITaskSchedulingDebugPanel'
 
 export class TSUITaskSchedulingDebugEntry extends ISPanel {
-  static instance: TSUITaskSchedulingDebugEntry | undefined
+  static instance?: TSUITaskSchedulingDebugEntry
 
   static mount() {
     const maxX = getCore().getScreenWidth()
@@ -48,7 +48,7 @@ export class TSUITaskSchedulingDebugEntry extends ISPanel {
       r: 0,
       g: 0,
       b: 0,
-      a: 0,
+      a: 0.5,
     }
     this.borderColor = {
       r: 0,
@@ -99,7 +99,6 @@ export class TSUITaskSchedulingDebugEntry extends ISPanel {
 
   onClick(button: ISButton & UIKey) {
     if (button.internal === 'test') {
-      print('test1')
       TSUITaskSchedulingDebugPanel.mount()
       return
     }
