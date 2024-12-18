@@ -1,6 +1,15 @@
 ## todo list
 
 1. 长任务调度
+暂停功能
+处理游戏暂停的情况
+
+切了个屏，卡死了（应该不是切屏导致的，估计是结束时不断调用结束任务的问题）
+任务结束后，结束任务在不断的被调用
+  nextRenderTick 有问题，回调未被清除
+Warning: Moveable not valid.
+写 task 的简化写法
+
 2. 物品数据转换
 3. tstl compiler，luaBundle 版本隔离
 4. java types 和 lua types 变量命名、变量类型、api 和变量描述的提取与合并(另外，strict types version)
@@ -12,6 +21,7 @@
 - type docs，严格模式（比如 ui 组件，不用 [x: string]: any）
 - 请求和全局数据相关的工具函数
 - 实现 ui 布局管理，新的 ui 组件，ui 组件问题修复（long task）
+- b42 types
 
 ## other todo
 
@@ -41,7 +51,7 @@
    外加类似于 create-react-app 的设计？
    可能需要一个 ci，当版本号 >= 990 时，报错以避免错误的影响 pz 版本号
 
-2. mod publish
+2. mod publish using ts
 3. lua 5.1 to lua jit? 就像饥荒那个改造一样？工程量可能会非常大，因为不是引用的 dll
 4. eslint 规则改造（但目前没有时间去做）
 5. pipewrench compiler 性能优化，现在似乎挺慢的
@@ -61,6 +71,16 @@
   mod namespace
 
 8. this.width 不存在，但却显示 any(strict types version)
+9. 项目依赖分析，按需编译文件和 mod 文件自动刷新
+10. pipewrench 缺少部分类型或者部分类型错误，比如
+11. 发布时保存提交的文件列表，并校验当次提交文件列表和之前提交的文件列表，若缺少文件，报错（或根据配置报 warning）
+
+java
+
+- Float class
+- itemVisual m_Hue、m_Decal、getBaseTexture
+
+11. ZedScript vscode 扩展改改那个换行问题
 
 ## 已完成
 
