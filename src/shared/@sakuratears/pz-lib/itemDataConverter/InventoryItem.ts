@@ -325,7 +325,8 @@ export const assignItemVisualData = (
     visual.setTextureChoice(data.m_TextureChoice)
   }
   if (data.m_Hue) {
-    (visual as ItemVisual & { m_Hue: number }).m_Hue = data.m_Hue
+    const v = visual as ItemVisual & { m_Hue: number }
+    v.m_Hue = data.m_Hue
   }
   if (data.m_Decal) {
     visual.setDecal(data.m_Decal)
