@@ -22,10 +22,10 @@ export class KeyConverter extends BaseConverter {
     }
     const data = result.data as KeyData
 
-    const keyId = item.getKeyId();
-    data.keyId = keyId;
-    const numberOfKey = item.getNumberOfKey();
-    data.numberOfKey = numberOfKey;
+    const keyId = item.getKeyId()
+    data.keyId = keyId
+    const numberOfKey = item.getNumberOfKey()
+    data.numberOfKey = numberOfKey
 
     return {
       data,
@@ -39,8 +39,8 @@ export class KeyConverter extends BaseConverter {
     }
     const item = result.item!
 
-    item.setKeyId(data.keyId);
-    item.setNumberOfKey(data.numberOfKey);
+    item.setKeyId(data.keyId)
+    item.setNumberOfKey(data.numberOfKey)
 
     return {
       item,

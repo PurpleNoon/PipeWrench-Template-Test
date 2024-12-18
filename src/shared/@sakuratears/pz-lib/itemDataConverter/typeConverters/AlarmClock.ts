@@ -23,12 +23,12 @@ export class AlarmClockConverter extends BaseConverter {
     }
     const data = result.data as AlarmClockData
 
-    const alarmHour = item.getHour();
-    data.alarmHour = alarmHour;
-    const alarmMinutes = item.getMinute();
-    data.alarmMinutes = alarmMinutes;
-    const alarmSet = item.isAlarmSet();
-    data.alarmSet = alarmSet;
+    const alarmHour = item.getHour()
+    data.alarmHour = alarmHour
+    const alarmMinutes = item.getMinute()
+    data.alarmMinutes = alarmMinutes
+    const alarmSet = item.isAlarmSet()
+    data.alarmSet = alarmSet
 
     return {
       data,
@@ -42,9 +42,9 @@ export class AlarmClockConverter extends BaseConverter {
     }
     const item = result.item!
 
-    item.setHour(data.alarmHour);
-    item.setMinute(data.alarmMinutes);
-    item.setAlarmSet(data.alarmSet);
+    item.setHour(data.alarmHour)
+    item.setMinute(data.alarmMinutes)
+    item.setAlarmSet(data.alarmSet)
 
     return {
       item,

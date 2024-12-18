@@ -1,12 +1,12 @@
 ## todo list
 
 1. 长任务调度
-暂停功能
-处理游戏暂停的情况
+   暂停功能
+   处理游戏暂停的情况
 
 切了个屏，卡死了（应该不是切屏导致的，估计是结束时不断调用结束任务的问题）
 任务结束后，结束任务在不断的被调用
-  nextRenderTick 有问题，回调未被清除
+nextRenderTick 有问题，回调未被清除
 Warning: Moveable not valid.
 写 task 的简化写法
 
