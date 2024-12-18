@@ -15,7 +15,7 @@ export interface TileItem {
   item: {
     groupName: string
     name: string
-    texture: Texture
+    texture?: Texture
     displayName: string
     IsMoveAble: boolean
     CanBreak: boolean
@@ -40,7 +40,7 @@ export const createCollectTexturesTask = (
     allTiles: [] as TileItem[],
     allTileGroupMap: {} as Record<string, TileItem[]>,
 
-    stage: Stage.tileGroupNamesIterating as Stage,
+    stage: Stage.tileGroupNamesIterating,
     tileGroupNames: void 0 as unknown as java.util.ArrayList<string>,
     tileGroupNamesTotal: 0,
     tileGroupNamesIndex: 0,
@@ -103,26 +103,27 @@ export const createCollectTexturesTask = (
         }
         data.tileGroupIndex++
         if (data.tileGroupIndex >= data.tileGroupTotal) {
-          data.stage = Stage.tileGroupIteratingCheck
-          // 不 return，接着执行
+          data.tileGroupNamesIndex++
+          data.stage = Stage.tileGroupNamesIterating
+          if (data.tileGroupNamesIndex >= data.tileGroupNamesTotal) {
+            data.stage = Stage.tileGroupIteratingCheck
+          }
         }
+        return false
       }
 
       if (data.stage === Stage.tileGroupIteratingCheck) {
-        data.tileGroupNamesIndex++
-        if (data.tileGroupNamesIndex >= data.tileGroupNamesTotal) {
-          // 删除没有有效贴图的分组
-          Object.keys(data.allTileGroupMap).forEach((groupName) => {
-            if (data.allTileGroupMap[groupName].length === 0) {
-              delete data.allTileGroupMap[groupName]
-            }
-          })
-          // task 执行完成
-          return true
-        }
+        // 删除没有有效贴图的分组
+        Object.keys(data.allTileGroupMap).forEach((groupName) => {
+          if (data.allTileGroupMap[groupName].length === 0) {
+            delete data.allTileGroupMap[groupName]
+          }
+        })
+        // task 执行完成
+        return true
       }
 
-      return false
+      throw `Wrong step stage`
     },
     progress({
       tileGroupNamesIndex,
