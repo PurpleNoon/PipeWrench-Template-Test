@@ -212,12 +212,12 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     this.currentTaskStageLabel = currentTaskStageLabel
 
     // 进度
-    const currentTaskProgressLabel = this.createLabelSimple(`progress: 0`)
+    const currentTaskProgressLabel = this.createLabelSimple(`progress: 0%`)
     this.addLineSimple(currentTaskProgressLabel)
     this.currentTaskProgressLabel = currentTaskProgressLabel
 
     // 已持续时间
-    const currentTaskDurationLabel = this.createLabelSimple(`duration: 0`)
+    const currentTaskDurationLabel = this.createLabelSimple(`duration: 0s`)
     this.addLineSimple(currentTaskDurationLabel)
     this.currentTaskDurationLabel = currentTaskDurationLabel
 
@@ -280,10 +280,10 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     this.currentTaskNameLabel?.setName(`name: ${task?.name || '-'}`)
     this.currentTaskStageLabel?.setName(`stage: ${this.getStage(taskWrap)}`)
     this.currentTaskProgressLabel?.setName(
-      `progress: ${taskWrap?.progress.toFixed(2) || '-'}`,
+      `progress: ${((taskWrap?.progress || 0) * 100).toFixed(2) || '-'}%`,
     )
     this.currentTaskDurationLabel?.setName(
-      `duration: ${this.getDuration(taskWrap)}`,
+      `duration: ${(this.getDuration(taskWrap) / 1000).toFixed(2)}s`,
     )
     this.currentTaskExceptTpsLabel?.setName(
       `exceptTps: ${taskWrap?.exceptTps || '-'}`,
