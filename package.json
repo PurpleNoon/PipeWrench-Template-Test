@@ -36,7 +36,7 @@
     "@typescript-eslint/eslint-plugin": "7.16.0",
     "@typescript-eslint/parser": "7.16.0",
     "@typescript-to-lua/language-extensions": "^1.19.0",
-    "del-cli": "^5.0.0",
+    "del-cli": "^6.0.0",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-import-resolver-typescript": "^3.5.0",
