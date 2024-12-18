@@ -1,17 +1,13 @@
 import {
   getSprite,
+  getTexture,
   InventoryItemFactory,
   isClient,
+  IsoDirections,
   isServer,
-  type Texture,
-  type zombie,
+  type IsoSprite,
 } from '@asledgehammer/pipewrench'
 import { onRenderTick, onTick } from '@asledgehammer/pipewrench-events'
-
-// @ts-expect-error 暂时添加缺失声明的全局函数
-const _getSpriteTexture = _G.getSpriteTexture as (
-  sprite: zombie.iso.sprite.IsoSprite,
-) => Texture
 
 /**
  * 获取当前运行在哪端？
@@ -27,10 +23,22 @@ export const getRunMode = () => {
   return 'sp'
 }
 
+export const getSpriteTexture = (sprite: IsoSprite) => {
+  const spriteName = sprite.getName()
+  if (!spriteName || spriteName === '') {
+    return
+  }
+  return (
+    sprite.LoadFrameExplicit(spriteName) ||
+    getTexture(`media/texturepacks/${spriteName}`) ||
+    sprite.getTextureForCurrentFrame(IsoDirections.N)
+  )
+}
+
 /** 通过贴图名称获取贴图信息 */
 export const getTileInfoByName = (tileName: string) => {
   const sprite = getSprite(tileName)
-  const texture = _getSpriteTexture(sprite)
+  const texture = getSpriteTexture(sprite)
   const props = sprite.getProperties()
   const IsMoveAble = props.Is('IsMoveAble')
   const PickUpWeight = props.Val('PickUpWeight') || ''
@@ -56,8 +64,9 @@ export const getTileInfoByName = (tileName: string) => {
 /** 在下一个 tick 执行任务 */
 export const nextTick = (cb: () => void) => {
   const cbWrapper = () => {
-    cb()
     onTick.removeListener(cbWrapper)
+    // print('[FILTER_TAG]remove tick')
+    cb()
   }
   onTick.addListener(cbWrapper)
 }
@@ -65,8 +74,9 @@ export const nextTick = (cb: () => void) => {
 /** 在下一个 renderTick 执行任务 */
 export const nextRenderTick = (cb: () => void) => {
   const cbWrapper = () => {
-    cb()
     onRenderTick.removeListener(cbWrapper)
+    // print('[FILTER_TAG]remove render tick')
+    cb()
   }
   onRenderTick.addListener(cbWrapper)
 }

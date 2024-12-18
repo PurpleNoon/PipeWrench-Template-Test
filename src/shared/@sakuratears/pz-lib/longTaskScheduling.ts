@@ -1,5 +1,9 @@
 import { getTimeInMillis, isGamePaused } from '@asledgehammer/pipewrench'
-import { onGameStart, onTickEvenPaused } from '@asledgehammer/pipewrench-events'
+import {
+  onGameStart,
+  onResetLua,
+  onTickEvenPaused,
+} from '@asledgehammer/pipewrench-events'
 import { getRunMode, nextRenderTick, nextTick } from '.'
 
 export type TaskPriority = 1 | 2 | 3 | 4 | 5
@@ -85,8 +89,10 @@ export interface TaskWrapper<T = any> {
 }
 
 export interface LongTaskSchedulingContext {
-  /** 当前 tick 执行的时间 */
-  latestTime: number
+  /** 前一个任务 tick 结束的时间 */
+  prevTaskTickEndTime: number
+  /** 当前任务 tick 开始的时间 */
+  currentTaskTickStartTime: number
   /** 当前 tps */
   tps: number
   /** 当前 tick 的任务执行时间 */
@@ -126,6 +132,7 @@ export interface LongTaskSchedulingManager {
   getTaskQueue(): TaskWrapper<any>[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getCurrentRunningTaskWrapper(): TaskWrapper<any> | undefined
+  getContext(): LongTaskSchedulingContext
 }
 
 const defaultTaskExceptTpsLevel = 1
@@ -133,22 +140,22 @@ const defaultTaskPriority = 3
 
 /** 客户端期望 tps 级别与期望 tps 对照表 */
 const clientExceptTpsMap = {
-  1: 60,
-  2: 45,
-  3: 30,
-  4: 15,
-  5: 10,
-  6: 5,
+  1: 60 as const,
+  2: 45 as const,
+  3: 30 as const,
+  4: 15 as const,
+  5: 10 as const,
+  6: 5 as const,
 }
 
 /** 服务端期望 tps 级别与期望 tps 对照表 */
 const serverExceptTpsMap = {
-  1: 20,
-  2: 15,
-  3: 10,
-  4: 5,
-  5: 3,
-  6: 1,
+  1: 20 as const,
+  2: 15 as const,
+  3: 10 as const,
+  4: 5 as const,
+  5: 3 as const,
+  6: 1 as const,
 }
 
 /** 根据期望 tps 级别获取期望 tps */
@@ -194,7 +201,9 @@ const removeTaskWrap = (
   const wrapperIndex = taskQueue.findIndex(
     (wrapper) => wrapper.task.name === taskName,
   )
+  // print(`wrapperIndex: ${wrapperIndex}, taskName: ${taskName}`)
   if (wrapperIndex > -1) {
+    // print(`task removed`)
     taskQueue.splice(wrapperIndex, 1)
   }
 }
@@ -236,7 +245,7 @@ const calcRemainingExecTime = (
 ) => {
   context.remainingExecTime =
     context.currentTickRemainingExecTime -
-    (getTimeInMillis() - context.latestTime)
+    (getTimeInMillis() - context.currentTaskTickStartTime)
   if (context.remainingExecTime <= 1) {
     // 存储 tps 补偿时间
     context.tpsCompensationTime = context.remainingExecTime
@@ -271,6 +280,7 @@ const runWithTaskErrorHappened = (
   // 移除报错的任务，打断当前 tick 的执行，抛出错误
   removeTaskWrap(taskQueue, task.name)
   context.currentRunningTaskWrapper = void 0
+  context.prevTaskTickEndTime = getTimeInMillis()
   if (typeof task.error === 'function') {
     task.error(error, task.data)
   }
@@ -294,7 +304,8 @@ class ExecutionStatusQueue {
  */
 export const createLongTaskSchedulingManager = () => {
   const context: LongTaskSchedulingContext = {
-    latestTime: 0,
+    prevTaskTickEndTime: 0,
+    currentTaskTickStartTime: 0,
     tps: 0,
     currentTickRemainingExecTime: 0,
     remainingExecTime: 0,
@@ -356,19 +367,24 @@ export const createLongTaskSchedulingManager = () => {
     context.gamePaused = isGamePaused()
     // 暂停时清空 tps 计时
     if (context.gamePaused !== prevGamePaused && context.gamePaused) {
-      context.latestTime = 0
+      context.prevTaskTickEndTime = 0
     }
     if (context.gamePaused) {
       return
     }
 
     const now = getTimeInMillis()
+    context.currentTaskTickStartTime = now
     // 运行的第一个 tick 不执行任务，因为无法计算 tps
-    if (context.latestTime === 0) {
-      context.latestTime = now
+    if (context.prevTaskTickEndTime === 0) {
+      context.prevTaskTickEndTime = now
       return
     }
-    context.tps = Math.floor(1000 / (context.latestTime - now))
+    const tickDuration = now - context.prevTaskTickEndTime
+    if (tickDuration <= 0) {
+      return
+    }
+    context.tps = Math.floor(1000 / tickDuration)
     // 设置 tps 补偿时间
     context.currentTickRemainingExecTime = context.tpsCompensationTime
     context.tpsCompensationTime = 0
@@ -376,7 +392,7 @@ export const createLongTaskSchedulingManager = () => {
     // 任务的执行策略
     // 权重，串行（期望尽可能快的减少任务）
     const runNextTask = () => {
-      if (context.taskQueue.length === 0 || context.remainingExecTime <= 0) {
+      if (context.taskQueue.length === 0) {
         return
       }
       // 获取权重最高的 task
@@ -392,7 +408,6 @@ export const createLongTaskSchedulingManager = () => {
 
       const runTask = (taskWrapper: TaskWrapper) => {
         const task = taskWrapper.task
-
         if (!taskWrapper.started) {
           taskWrapper.startTime = getTimeInMillis()
           taskWrapper.progress = 0
@@ -401,7 +416,6 @@ export const createLongTaskSchedulingManager = () => {
             task.exceptTpsLevel || defaultTaskExceptTpsLevel
           taskWrapper.exceptTps = getExceptTps(task)
         }
-
         const finalExceptTps = getFinalExceptTps(
           taskWrapper.exceptTps,
           context.tps,
@@ -414,11 +428,17 @@ export const createLongTaskSchedulingManager = () => {
         // 任务执行用了 3ms，执行完成，还剩 7ms，然后执行下一个任务，
         // 根据新任务的期望 tps，得出可用 20ms，
         // 那当前剩余可用时间为 20ms - 3ms = 17ms
+        const currentTickUsedTime =
+          getTimeInMillis() - context.currentTaskTickStartTime
         context.currentTickRemainingExecTime +=
-          taskExecTimeInATick - (getTimeInMillis() - context.latestTime)
+          taskExecTimeInATick - currentTickUsedTime
         context.remainingExecTime = context.currentTickRemainingExecTime
         // 任务改变后或被 tps 补偿时间抵消，导致剩余时间不足，跳过当前 tick
         if (context.remainingExecTime <= 0) {
+          return
+        }
+        // 临时解决方案，当切屏或者暂停后，导致可执行时间过长时，跳过当前 tick
+        if (context.remainingExecTime > 1000) {
           return
         }
 
@@ -427,17 +447,15 @@ export const createLongTaskSchedulingManager = () => {
           if (typeof task.start === 'function') {
             try {
               task.start(task.data)
-              taskWrapper.started = true
             } catch (error) {
               runWithTaskErrorHappened(error, taskWrapper, context)
               return
             }
-            const isStartUnexpired = calcRemainingExecTime(taskWrapper, context)
-            if (!isStartUnexpired) {
-              return
-            }
-          } else {
-            taskWrapper.started = true
+          }
+          taskWrapper.started = true
+          const isStartUnexpired = calcRemainingExecTime(taskWrapper, context)
+          if (!isStartUnexpired) {
+            return
           }
         }
 
@@ -465,22 +483,25 @@ export const createLongTaskSchedulingManager = () => {
         }
 
         // task finish stage
-        if (typeof task.finish === 'function') {
+        if (!taskWrapper.finished && typeof task.finish === 'function') {
           try {
+            // print('[FILTER_TAG]10')
             if (task.finishInRenderTick) {
               nextRenderTick(() => {
                 task.finish && task.finish(task.data)
-                taskWrapper.finished = true
+                // print('[FILTER_TAG]21')
               })
             } else {
               nextTick(() => {
                 task.finish && task.finish(task.data)
-                taskWrapper.finished = true
+                // print('[FILTER_TAG]22')
               })
             }
+            taskWrapper.finished = true
             taskWrapper.endTime = getTimeInMillis()
             removeTaskWrap(context.taskQueue, task.name)
             context.currentRunningTaskWrapper = void 0
+            // print('[FILTER_TAG]11')
           } catch (error) {
             runWithTaskErrorHappened(error, taskWrapper, context)
             return
@@ -494,13 +515,14 @@ export const createLongTaskSchedulingManager = () => {
           taskWrapper.endTime = getTimeInMillis()
         }
         context.currentRunningTaskWrapper = void 0
-
+        // print('[FILTER_TAG]12')
         runNextTask()
       }
 
       runTask(currentTaskWrapper)
     }
     runNextTask()
+    context.prevTaskTickEndTime = getTimeInMillis()
   }
 
   const remove = (task: Task | string) => {
@@ -526,7 +548,7 @@ export const createLongTaskSchedulingManager = () => {
       onTickEvenPaused.addListener(tickListener)
     },
     stop() {
-      context.latestTime = 0
+      context.prevTaskTickEndTime = 0
       onTickEvenPaused.removeListener(tickListener)
     },
     /** 获取任务的对外暴露的包装 */
@@ -570,30 +592,32 @@ export const createLongTaskSchedulingManager = () => {
 
 // =================== 分割线 ====================
 
-const task: Task<{
+export const exampleTask: Task<{
   count: number
+  finalCount: number
 }> = {
   name: 'test',
   exceptTpsLevel: 1,
   priority: 3,
   data: {
     count: 0,
+    finalCount: 1000000000,
   },
   start() {
     print('start')
     this.data.count = 0
   },
   step() {
-    print('step')
-    this.data.count++
-    if (this.data.count >= 10) {
+    // print('step')
+    if (this.data.count >= this.data.finalCount) {
       return true
     }
+    this.data.count++
     return false
   },
-  progress(): number {
-    print('progress')
-    return this.data.count / 10
+  progress() {
+    // print('progress')
+    return this.data.count / this.data.finalCount
   },
   finish() {
     print('finish')
@@ -601,11 +625,14 @@ const task: Task<{
   // error(err) {},
 }
 
-longTaskSchedulingManager = createLongTaskSchedulingManager()
+export const longTaskSchedulingManager = createLongTaskSchedulingManager()
 
-// 使用
 onGameStart.addListener(() => {
   longTaskSchedulingManager.start()
 })
 
-longTaskSchedulingManager.add(task)
+onResetLua.addListener(() => {
+  longTaskSchedulingManager.stop()
+})
+
+// longTaskSchedulingManager.add(exampleTask)
