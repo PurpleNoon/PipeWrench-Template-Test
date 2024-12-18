@@ -32,6 +32,7 @@ InventoryContainer
 测一下 stashMap 有没有用
 看一下 recordedMediaIndex 是做什么的
 衣服的补丁存取问题，或许可以通过创建一个缝纫等级满级的 IsoGameCharacter 和相应材料来实现
+想办法把 __ITEM_DATA_TYPE 干掉
 
 ## 已完成
 ComboItem
