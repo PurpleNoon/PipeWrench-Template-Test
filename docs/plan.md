@@ -123,4 +123,3 @@ end)
 ```
 
 - ~~top class 换成 ISBaseObject？ISBaseObject 新增的内容怎么分享到 ts class~~（尝试实现的时候出了点问题，暂不实现）
-

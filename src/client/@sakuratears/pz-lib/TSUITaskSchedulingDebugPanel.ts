@@ -294,7 +294,9 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     if (currentTaskDuration === 0 || currentTaskProgress === 0) {
       return 0
     }
-    return (currentTaskDuration / currentTaskProgress) * 100 - currentTaskDuration
+    return (
+      (currentTaskDuration / currentTaskProgress) * 100 - currentTaskDuration
+    )
   }
 
   update() {
