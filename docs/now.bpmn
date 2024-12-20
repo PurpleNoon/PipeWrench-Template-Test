@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:bioc="http://bpmn.io/schema/bpmn/biocolor/1.0" xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_06wedfu" targetNamespace="http://bpmn.io/schema/bpmn" exporter="bpmn-js (https://demo.bpmn.io)" exporterVersion="18.1.1">
+  <bpmn:collaboration id="Collaboration_14b369n">
+    <bpmn:participant id="Participant_0l6s8pp" processRef="Process_0stkawh" />
+    <bpmn:textAnnotation id="TextAnnotation_0sqbykw">
+      <bpmn:text>now</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Association_0pg4954" associationDirection="None" sourceRef="Participant_0l6s8pp" targetRef="TextAnnotation_0sqbykw" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_0stkawh" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_03sc9jn" />
+    <bpmn:task id="Activity_0c4lhtd" name="PipeWrench-Compiler">
+      <bpmn:outgoing>Flow_0x97fk2</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Activity_02gw8mh" name="which repo provide java ts types?">
+      <bpmn:outgoing>Flow_1b5kwmw</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Activity_0u3datu" name="PipeWrench-Template">
+      <bpmn:incoming>Flow_0x97fk2</bpmn:incoming>
+      <bpmn:incoming>Flow_1675s8g</bpmn:incoming>
+    </bpmn:task>
+    <bpmn:task id="Activity_1m8fnuy" name="PipeWrench">
+      <bpmn:incoming>Flow_0utk85h</bpmn:incoming>
+      <bpmn:incoming>Flow_1b5kwmw</bpmn:incoming>
+      <bpmn:outgoing>Flow_1675s8g</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Activity_1jbmrwx" name="PipeWrench-Modeler">
+      <bpmn:outgoing>Flow_0utk85h</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:sequenceFlow id="Flow_0x97fk2" sourceRef="Activity_0c4lhtd" targetRef="Activity_0u3datu" />
+    <bpmn:sequenceFlow id="Flow_1b5kwmw" sourceRef="Activity_02gw8mh" targetRef="Activity_1m8fnuy" />
+    <bpmn:sequenceFlow id="Flow_1675s8g" name="provide java and lua ts types library" sourceRef="Activity_1m8fnuy" targetRef="Activity_0u3datu" />
+    <bpmn:sequenceFlow id="Flow_0utk85h" name="provide lua ts types" sourceRef="Activity_1jbmrwx" targetRef="Activity_1m8fnuy" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_14b369n">
+      <bpmndi:BPMNShape id="Participant_0l6s8pp_di" bpmnElement="Participant_0l6s8pp" isHorizontal="true">
+        <dc:Bounds x="160" y="120" width="650" height="370" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0c4lhtd_di" bpmnElement="Activity_0c4lhtd" bioc:stroke="#0d4372" bioc:fill="#bbdefb" color:background-color="#bbdefb" color:border-color="#0d4372">
+        <dc:Bounds x="210" y="140" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_02gw8mh_di" bpmnElement="Activity_02gw8mh" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <dc:Bounds x="430" y="390" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0u3datu_di" bpmnElement="Activity_0u3datu" bioc:stroke="#0d4372" bioc:fill="#bbdefb" color:background-color="#bbdefb" color:border-color="#0d4372">
+        <dc:Bounds x="690" y="140" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1m8fnuy_di" bpmnElement="Activity_1m8fnuy" bioc:stroke="#0d4372" bioc:fill="#bbdefb" color:background-color="#bbdefb" color:border-color="#0d4372">
+        <dc:Bounds x="430" y="268" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1jbmrwx_di" bpmnElement="Activity_1jbmrwx" bioc:stroke="#0d4372" bioc:fill="#bbdefb" color:background-color="#bbdefb" color:border-color="#0d4372">
+        <dc:Bounds x="210" y="268" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_0x97fk2_di" bpmnElement="Flow_0x97fk2">
+        <di:waypoint x="310" y="180" />
+        <di:waypoint x="690" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1b5kwmw_di" bpmnElement="Flow_1b5kwmw">
+        <di:waypoint x="480" y="390" />
+        <di:waypoint x="480" y="348" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1675s8g_di" bpmnElement="Flow_1675s8g">
+        <di:waypoint x="530" y="308" />
+        <di:waypoint x="575" y="308" />
+        <di:waypoint x="575" y="180" />
+        <di:waypoint x="690" y="180" />
+        <bpmndi:BPMNLabel color:color="#6b3c00">
+          <dc:Bounds x="555" y="314" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0utk85h_di" bpmnElement="Flow_0utk85h">
+        <di:waypoint x="310" y="308" />
+        <di:waypoint x="430" y="308" />
+        <bpmndi:BPMNLabel color:color="#6b3c00">
+          <dc:Bounds x="337" y="274" width="66" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_0pg4954_di" bpmnElement="Association_0pg4954">
+        <di:waypoint x="243" y="120" />
+        <di:waypoint x="230" y="110" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="TextAnnotation_0sqbykw_di" bpmnElement="TextAnnotation_0sqbykw">
+        <dc:Bounds x="160" y="80" width="100" height="30" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

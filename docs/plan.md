@@ -1,14 +1,21 @@
 ## todo list
 
+- b42 build
+<!-- "@asledgehammer/tstl-pipewrench": "^41.78.19", -->
+
 1. 长任务调度
    暂停功能
    处理游戏暂停的情况
 
-切了个屏，卡死了（应该不是切屏导致的，估计是结束时不断调用结束任务的问题）
 任务结束后，结束任务在不断的被调用
-nextRenderTick 有问题，回调未被清除
+nextRenderTick 有问题，回调未被清除(pipewrench 的 java 部分有问题，removeListener 是 Add)
 Warning: Moveable not valid.
 写 task 的简化写法
+预计剩余时间
+持续时间和实际执行时间
+tps 显示/计算可能有点问题，有时候会闪过几百
+历史执行的任务展示
+对外暴露的函数整理一下
 
 2. 物品数据转换
 3. tstl compiler，luaBundle 版本隔离
@@ -79,6 +86,8 @@ java
 
 - Float class
 - itemVisual m_Hue、m_Decal、getBaseTexture
+- ArrayList 泛型不太行
+- getWorld().getAllTiles() 的返回类型可能不对
 
 11. ZedScript vscode 扩展改改那个换行问题
 
@@ -114,3 +123,4 @@ end)
 ```
 
 - ~~top class 换成 ISBaseObject？ISBaseObject 新增的内容怎么分享到 ts class~~（尝试实现的时候出了点问题，暂不实现）
+
