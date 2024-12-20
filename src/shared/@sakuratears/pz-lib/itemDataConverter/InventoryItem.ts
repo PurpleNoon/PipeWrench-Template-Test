@@ -2,7 +2,7 @@ import {
   BloodBodyPartType,
   Color,
   ImmutableColor,
-  InventoryItemFactory,
+  instanceItem,
   type DrainableComboItem,
   type InventoryItem,
   type ItemVisual,
@@ -367,7 +367,9 @@ export const baseDataToItem = (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: BaseItemData,
 ): DataToItemResult<InventoryItem> => {
-  const item = InventoryItemFactory.CreateItem(data.fullType, 1, false)
+  // const item = InventoryItemFactory.CreateItem(data.fullType, 1, false)
+  const item = instanceItem(data.fullType)
+
   item.setID(data.id)
   if (data.isDrainable && data.usedDelta) {
     const drainableComboItem = item as DrainableComboItem

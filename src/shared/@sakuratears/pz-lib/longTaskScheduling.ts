@@ -4,7 +4,7 @@ import {
   onResetLua,
   onTickEvenPaused,
 } from '@asledgehammer/pipewrench-events'
-import { getRunMode, nextRenderTick, nextTick } from '.'
+import { getRunMode, nextRenderTick, nextTick, omit } from '.'
 
 export type TaskPriority = 1 | 2 | 3 | 4 | 5
 export type TaskExceptTpsLevel = 1 | 2 | 2 | 4 | 5 | 6
@@ -35,7 +35,7 @@ export interface Task<T = any> {
    *    - 6 => 1tps
    */
   exceptTpsLevel?: TaskExceptTpsLevel
-  /** 1-5, 5是最优先，默认值为 3，step 函数执行时间过长时，会根据超出的时间来降低该任务优先级 */
+  /** 1-5, 5是最优先，默认值为 3，函数执行时间过长时，会根据超出的时间来降低该任务优先级 */
   priority?: TaskPriority
   /** 任务结束时，finish 是否在 renderTick 执行，默认不在 renderTick 中执行 */
   finishInRenderTick?: boolean
@@ -50,7 +50,9 @@ export interface Task<T = any> {
   /**
    * 返回值表示任务是否已完成，返回 true 时会中止任务执行并移除任务
    *
-   * 尽可能保证该函数执行时间不超过任务最小执行时间(4ms)
+   * 尽可能保证该函数单次执行时间不超过任务最小执行时间(4ms)
+   *
+   * 执行时间超出的越多，tps 波动越大
    */
   step: (data: T) => boolean
   /**
@@ -68,7 +70,7 @@ export interface Task<T = any> {
   /**
    * 任务执行报错时会执行该函数
    *
-   * 尽可能保证该函数执行时间不超过任务最小执行时间(4ms)
+   * 尽可能保证该函数执行时间尽可能的小(不超过 1ms)
    * @param err 抛出的错误
    */
   error?: (err: unknown, data: T) => void
@@ -80,17 +82,34 @@ export interface TaskWrapper<T = any> {
   exceptTpsLevel: TaskExceptTpsLevel
   exceptTps: number
   priority: TaskPriority
+  /** 任务开始执行的时间 */
   startTime: number
+  /** 任务执行完成的时间 */
   endTime: number
+  /** 实际执行时间(ms) */
+  actualExecTime: number
   progress: number
   started: boolean
   executed: boolean
   finished: boolean
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type PrevTask<T = any> = Omit<
+  Task<T>,
+  'data' | 'start' | 'step' | 'progress' | 'finish' | 'error'
+>
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface PrevTaskWrapper<T = any> extends Omit<TaskWrapper<T>, 'task'> {
+  prevTask: PrevTask<T>
+}
+
 export interface LongTaskSchedulingContext {
   /** 前一个任务 tick 结束的时间 */
   prevTaskTickEndTime: number
+  /** 前一个任务 tick 开始的时间 */
+  prevTaskTickStartTime: number
   /** 当前任务 tick 开始的时间 */
   currentTaskTickStartTime: number
   /** 当前 tps */
@@ -103,6 +122,8 @@ export interface LongTaskSchedulingContext {
   gamePaused: boolean
   /** 当前在执行的任务 */
   currentRunningTaskWrapper: TaskWrapper | undefined
+  /** 上次执行的任务 */
+  prevTaskWrapper?: PrevTaskWrapper
   /** 任务队列 */
   taskQueue: TaskWrapper[]
   /** 任务最小执行时间，单位：ms */
@@ -186,6 +207,7 @@ const createTaskWrapper = (task: Task): TaskWrapper => {
     priority: 1,
     startTime: -1,
     endTime: -1,
+    actualExecTime: 0,
     progress: 0,
     started: false,
     executed: false,
@@ -267,7 +289,10 @@ const calcRemainingExecTime = (
   return true
 }
 
-/** 处理任务报错 */
+/**
+ * TODO: try catch 可能并不生效
+ * 处理任务报错
+ */
 const runWithTaskErrorHappened = (
   error: unknown,
   taskWrapper: TaskWrapper,
@@ -277,14 +302,34 @@ const runWithTaskErrorHappened = (
   const { task } = taskWrapper
   taskWrapper.endTime = getTimeInMillis()
   calcRemainingExecTime(taskWrapper, context)
+  if (context.currentRunningTaskWrapper) {
+    context.currentRunningTaskWrapper.actualExecTime +=
+      context.currentTickRemainingExecTime - context.remainingExecTime
+  }
   // 移除报错的任务，打断当前 tick 的执行，抛出错误
   removeTaskWrap(taskQueue, task.name)
+  context.prevTaskWrapper = getPrevTaskWrapper(taskWrapper)
   context.currentRunningTaskWrapper = void 0
   context.prevTaskTickEndTime = getTimeInMillis()
+  context.prevTaskTickStartTime = context.currentTaskTickStartTime
   if (typeof task.error === 'function') {
     task.error(error, task.data)
   }
   throw error
+}
+
+const getPrevTaskWrapper = (taskWrapper: TaskWrapper) => {
+  return {
+    ...taskWrapper,
+    prevTask: omit(taskWrapper.task, [
+      'data',
+      'start',
+      'step',
+      'progress',
+      'finish',
+      'data',
+    ]),
+  }
 }
 
 /** 执行情况的队列，循环队列 */
@@ -305,6 +350,7 @@ class ExecutionStatusQueue {
 export const createLongTaskSchedulingManager = () => {
   const context: LongTaskSchedulingContext = {
     prevTaskTickEndTime: 0,
+    prevTaskTickStartTime: 0,
     currentTaskTickStartTime: 0,
     tps: 0,
     currentTickRemainingExecTime: 0,
@@ -340,7 +386,7 @@ export const createLongTaskSchedulingManager = () => {
   // （理论上，任务调度执行正常时，造成 tps 波动幅度较小）
   // 直至执行完成
 
-  // TODO: 考虑 tps 持续低于 期望 60tps 的一定值的情况
+  // TODO: 考虑 tps 持续低于 期望 tps 的一定时间的情况
   // 若连续一段时间（暂定为 10s）执行机会小于指定次数（暂定为 10 次），重新调整预期 tps
   // 使用循环队列优化计算
 
@@ -368,6 +414,7 @@ export const createLongTaskSchedulingManager = () => {
     // 暂停时清空 tps 计时
     if (context.gamePaused !== prevGamePaused && context.gamePaused) {
       context.prevTaskTickEndTime = 0
+      context.prevTaskTickStartTime = 0
     }
     if (context.gamePaused) {
       return
@@ -378,8 +425,10 @@ export const createLongTaskSchedulingManager = () => {
     // 运行的第一个 tick 不执行任务，因为无法计算 tps
     if (context.prevTaskTickEndTime === 0) {
       context.prevTaskTickEndTime = now
+      context.prevTaskTickStartTime = now
       return
     }
+    // const tickDuration = now - context.prevTaskTickStartTime
     const tickDuration = now - context.prevTaskTickEndTime
     if (tickDuration <= 0) {
       return
@@ -399,9 +448,6 @@ export const createLongTaskSchedulingManager = () => {
       const currentTaskWrapper = getMaxPriorityTaskWrapper(context.taskQueue)
       // 当前无任务
       if (!currentTaskWrapper) {
-        context.currentTickRemainingExecTime = 0
-        context.remainingExecTime = 0
-        context.tpsCompensationTime = 0
         return
       }
       context.currentRunningTaskWrapper = currentTaskWrapper
@@ -500,7 +546,6 @@ export const createLongTaskSchedulingManager = () => {
             taskWrapper.finished = true
             taskWrapper.endTime = getTimeInMillis()
             removeTaskWrap(context.taskQueue, task.name)
-            context.currentRunningTaskWrapper = void 0
             // print('[FILTER_TAG]11')
           } catch (error) {
             runWithTaskErrorHappened(error, taskWrapper, context)
@@ -514,6 +559,11 @@ export const createLongTaskSchedulingManager = () => {
           taskWrapper.finished = true
           taskWrapper.endTime = getTimeInMillis()
         }
+        if (context.currentRunningTaskWrapper) {
+          context.currentRunningTaskWrapper.actualExecTime +=
+            context.currentTickRemainingExecTime - context.remainingExecTime
+        }
+        context.prevTaskWrapper = getPrevTaskWrapper(taskWrapper)
         context.currentRunningTaskWrapper = void 0
         // print('[FILTER_TAG]12')
         runNextTask()
@@ -523,6 +573,7 @@ export const createLongTaskSchedulingManager = () => {
     }
     runNextTask()
     context.prevTaskTickEndTime = getTimeInMillis()
+    context.prevTaskTickStartTime = context.currentTaskTickStartTime
   }
 
   const remove = (task: Task | string) => {
@@ -549,6 +600,7 @@ export const createLongTaskSchedulingManager = () => {
     },
     stop() {
       context.prevTaskTickEndTime = 0
+      context.prevTaskTickStartTime = 0
       onTickEvenPaused.removeListener(tickListener)
     },
     /** 获取任务的对外暴露的包装 */
@@ -601,7 +653,7 @@ export const exampleTask: Task<{
   priority: 3,
   data: {
     count: 0,
-    finalCount: 1000000000,
+    finalCount: 100000,
   },
   start() {
     print('start')

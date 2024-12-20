@@ -1,7 +1,7 @@
 import {
   getSprite,
   getTexture,
-  InventoryItemFactory,
+  instanceItem,
   isClient,
   IsoDirections,
   isServer,
@@ -45,9 +45,7 @@ export const getTileInfoByName = (tileName: string) => {
   const ContainerCapacity = props.Val('ContainerCapacity')
   const FreezerCapacity = props.Val('FreezerCapacity')
   const customItem = props.Val('CustomItem')
-  const item = InventoryItemFactory.CreateItem(
-    customItem || `Moveables.${tileName}`,
-  )
+  const item = instanceItem(customItem || `Moveables.${tileName}`)
   const displayName = item?.getDisplayName() || ''
   const Capacity = ContainerCapacity || FreezerCapacity || ''
   return {
@@ -87,4 +85,18 @@ export const divide = (n1: number, n2: number) => {
     return 0
   }
   return n1 / n2
+}
+
+/**
+ * 返回移除了相应属性的新对象
+ */
+export const omit = <T extends object, TKeys extends keyof T>(
+  obj: T,
+  keys: TKeys[],
+): Omit<T, TKeys> => {
+  const nowObj = { ...obj }
+  keys.forEach((key) => {
+    delete nowObj[key]
+  })
+  return nowObj
 }

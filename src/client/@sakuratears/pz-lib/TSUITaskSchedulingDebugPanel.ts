@@ -15,12 +15,14 @@ import {
 } from '@asledgehammer/pipewrench/client'
 import type { UIKey } from '../../../shared/types'
 import {
+  // exampleTask,
   longTaskSchedulingManager,
   type LongTaskSchedulingManager,
   type TaskWrapper,
 } from '../../../shared/@sakuratears/pz-lib/longTaskScheduling'
 import {
   createCollectTexturesTask,
+  // createCollectTexturesTask,
   type TaskFinishData,
 } from '../../../shared/collectTexturesTask'
 
@@ -59,8 +61,8 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     // }
     const screenWidth = getCore().getScreenWidth()
     const screenHeight = getCore().getScreenHeight()
-    const debugPanelWidth = 240
-    const debugPanelHeight = 300
+    const debugPanelWidth = 300
+    const debugPanelHeight = 500
     // const [debugPanelX, debugPanelY] = screenCenterOf(
     //   debugPanelWidth,
     //   debugPanelHeight,
@@ -103,6 +105,8 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
   currentTaskStageLabel?: ISLabel
   currentTaskProgressLabel?: ISLabel
   currentTaskDurationLabel?: ISLabel
+  currentTaskFinishOnLabel?: ISLabel
+  currentTaskActualExecTimeLabel?: ISLabel
   currentTaskExceptTpsLabel?: ISLabel
   currentTaskPriorityLabel?: ISLabel
   constructor(
@@ -195,7 +199,11 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     this.addLineSimple(taskGamePausedLabel)
     this.taskGamePausedLabel = taskGamePausedLabel
 
-    const insertTaskBtn = this.createInsertTaskBtn()
+    const insertTaskBtn = this.createBtn(
+      'insert task',
+      this.onInsetTask,
+      'insertTask',
+    )
     this.addLineSimple(insertTaskBtn)
     this.insertTaskBtn = insertTaskBtn
 
@@ -221,6 +229,19 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     this.addLineSimple(currentTaskDurationLabel)
     this.currentTaskDurationLabel = currentTaskDurationLabel
 
+    // 预计完成时间
+    const currentTaskFinishOnLabel = this.createLabelSimple(
+      `expected to be completed on: -`,
+    )
+    this.addLineSimple(currentTaskFinishOnLabel)
+    this.currentTaskFinishOnLabel = currentTaskFinishOnLabel
+
+    // 实际执行时间
+    const currentTaskActualExecTimeLabel =
+      this.createLabelSimple(`duration: 0s`)
+    this.addLineSimple(currentTaskActualExecTimeLabel)
+    this.currentTaskActualExecTimeLabel = currentTaskActualExecTimeLabel
+
     // 期望 tps
     const currentTaskExceptTpsLabel = this.createLabelSimple(`exceptTps: 0`)
     this.addLineSimple(currentTaskExceptTpsLabel)
@@ -234,7 +255,7 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     // 其他
 
     // 关闭按钮
-    const closeBtn = this.createCloseBtn()
+    const closeBtn = this.createBtn('close', this.onClose, 'close')
     this.addLineSimple(closeBtn)
     this.closeBtn = closeBtn
   }
@@ -250,7 +271,7 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
       return 'Executed'
     }
     if (taskWrap.started) {
-      return 'Started'
+      return 'Running'
     }
     return 'Not Running'
   }
@@ -266,6 +287,16 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     return taskWrap.endTime - taskWrap.startTime
   }
 
+  getCurrentTaskFinishOn(
+    currentTaskDuration: number,
+    currentTaskProgress: number,
+  ) {
+    if (currentTaskDuration === 0 || currentTaskProgress === 0) {
+      return 0
+    }
+    return (currentTaskDuration / currentTaskProgress) * 100 - currentTaskDuration
+  }
+
   update() {
     const taskQueue = this.taskManager.getTaskQueue()
     const managerContext = this.taskManager.getContext()
@@ -279,11 +310,23 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     const task = taskWrap?.task
     this.currentTaskNameLabel?.setName(`name: ${task?.name || '-'}`)
     this.currentTaskStageLabel?.setName(`stage: ${this.getStage(taskWrap)}`)
+    const currentTaskProgress = (taskWrap?.progress || 0) * 100
     this.currentTaskProgressLabel?.setName(
-      `progress: ${((taskWrap?.progress || 0) * 100).toFixed(2) || '-'}%`,
+      `progress: ${currentTaskProgress.toFixed(2) || '-'}%`,
     )
+    const currentTaskDuration = this.getDuration(taskWrap) / 1000
     this.currentTaskDurationLabel?.setName(
-      `duration: ${(this.getDuration(taskWrap) / 1000).toFixed(2)}s`,
+      `duration: ${currentTaskDuration.toFixed(2)}s`,
+    )
+    const currentTaskFinishOn = this.getCurrentTaskFinishOn(
+      currentTaskDuration,
+      currentTaskProgress,
+    )
+    this.currentTaskFinishOnLabel?.setName(
+      `expected to be completed on: ${currentTaskFinishOn === 0 ? '-' : `${currentTaskFinishOn}s`}`,
+    )
+    this.currentTaskActualExecTimeLabel?.setName(
+      `exceptTps: ${taskWrap?.actualExecTime ? `${(taskWrap?.actualExecTime / 1000).toFixed(2)}s` : '-'}`,
     )
     this.currentTaskExceptTpsLabel?.setName(
       `exceptTps: ${taskWrap?.exceptTps || '-'}`,
@@ -293,51 +336,23 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     )
   }
 
-  createCloseBtn() {
-    const closeBtn: ISButton & UIKey = new ISButton(
-      this.currentLeft,
-      this.currentHeight,
-      40,
-      24,
-      'close',
-      this,
-      this.onClose,
-      void 0,
-      void 0,
-    )
-    closeBtn.internal = 'close'
-    closeBtn.anchorRight = true
-    closeBtn.anchorBottom = true
-    closeBtn.anchorTop = false
-    closeBtn.anchorLeft = false
-    closeBtn.initialise()
-    closeBtn.instantiate()
-    closeBtn.borderColor = {
-      r: 0,
-      g: 0,
-      b: 0,
-      a: 0,
-    }
-    return closeBtn
-  }
-
   onClose() {
     TSUITaskSchedulingDebugPanel.close()
   }
 
-  createInsertTaskBtn() {
+  createBtn(title: string, onClick: () => void, internal = title) {
     const closeBtn: ISButton & UIKey = new ISButton(
       this.currentLeft,
       this.currentHeight,
       40,
       24,
-      'insert task',
+      title,
       this,
-      this.onInsetTask,
+      onClick,
       void 0,
       void 0,
     )
-    closeBtn.internal = 'insertTask'
+    closeBtn.internal = internal
     closeBtn.anchorRight = true
     closeBtn.anchorBottom = true
     closeBtn.anchorTop = false
@@ -360,11 +375,12 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
   onInsetTask() {
     const collectTexturesTask = createCollectTexturesTask(this.onCollectFinish)
     longTaskSchedulingManager.add(collectTexturesTask)
+    // ==========
+    // longTaskSchedulingManager.add(exampleTask)
   }
 
   init() {
     this.initialise()
-    // this.instantiate()
     this.setVisible(true)
     this.addToUIManager()
   }

@@ -1,0 +1,366 @@
+import {
+  _instanceof_,
+  getWorld,
+  type java,
+  type Texture,
+} from '@asledgehammer/pipewrench'
+import { type Task } from './@sakuratears/pz-lib/longTaskScheduling'
+import { divide, getTileInfoByName } from './@sakuratears/pz-lib'
+
+export { divide, nextTick, nextRenderTick } from './@sakuratears/pz-lib'
+
+// enum Stage {
+//   tileGroupNamesIterating = 'tileGroupNamesIterating',
+//   tileGroupIterating = 'tileGroupIterating',
+//   tileGroupIteratingCheck = 'tileGroupIteratingCheck',
+// }
+
+export interface TileItem {
+  name: string
+  item: {
+    groupName: string
+    name: string
+    texture?: Texture
+    displayName: string
+    IsMoveAble: boolean
+    CanBreak: boolean
+    PickUpWeight: string
+    Capacity: string
+  }
+  tooltip: string
+}
+
+export interface TaskFinishData {
+  allTiles: TileItem[]
+  allTileGroupMap: Record<string, TileItem[]>
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface ArrayList<T = any> extends java.util.ArrayList<T> {}
+const isArrayList = <T>(items: ArrayList<T> | T[]): items is ArrayList<T> =>
+  _instanceof_(items, 'ArrayList')
+
+interface TaskIterBuilder<T> {
+  index: number
+  total: number
+  items: ArrayList<T> | T[]
+  init(): void
+  get(): LuaMultiReturn<[T, number, ArrayList<T> | T[], number]>
+  inc(): boolean
+}
+
+const createIterBuilder = <T>(
+  items: ArrayList<T> | T[],
+): TaskIterBuilder<T> => {
+  // TODO: 处理 items length 为 0 的情况
+  const builder: TaskIterBuilder<T> = {
+    index: 1,
+    total: 1,
+    items: items,
+    init() {
+      if (isArrayList(items)) {
+        this.total = items.size()
+        this.index = 0
+      } else {
+        this.total = items.length + 1
+        this.index = 1
+      }
+    },
+    get() {
+      const value = isArrayList(items)
+        ? items.get(this.index)
+        : items[this.index]
+      return $multi(value, this.index, this.items, this.total)
+    },
+    inc() {
+      if (this.index < this.total) {
+        this.index++
+        return false
+      }
+      return true
+    },
+  }
+  builder.init()
+  return builder
+}
+
+export const createCollectTexturesTask = (
+  cb: (data: {
+    allTiles: TileItem[]
+    allTileGroupMap: Record<string, TileItem[]>
+  }) => void,
+) => {
+  const data = {
+    allTiles: [] as TileItem[],
+    allTileGroupMap: {} as Record<string, TileItem[]>,
+
+    // stage: Stage.tileGroupNamesIterating,
+    // tileGroupNames: void 0 as unknown as java.util.ArrayList<string>,
+    // tileGroupNamesTotal: 0,
+    // tileGroupNamesIndex: 0,
+
+    // tileGroup: void 0 as unknown as java.util.ArrayList<string>,
+    // tileGroupTotal: 0,
+    // tileGroupIndex: 0,
+
+    tileGroupNamesBuilder: void 0 as unknown as TaskIterBuilder<string>,
+    tileGroupBuilder: void 0 as unknown as TaskIterBuilder<string>,
+
+    stage1: 1,
+  }
+  const task: Task<typeof data> = {
+    name: 'collectTexturesTask',
+    finishInRenderTick: true,
+    data,
+    start(data) {
+      data.tileGroupNamesBuilder = createIterBuilder(
+        getWorld().getAllTilesName(),
+      )
+    },
+    step(data) {
+      if (data.stage1 === 1) {
+        // all init
+        // outer init
+        data.tileGroupNamesBuilder = createIterBuilder(
+          getWorld().getAllTilesName(),
+        )
+        // to 2
+        data.stage1 = 2
+      }
+
+      // outer iter start
+      // inner init
+      if (data.stage1 === 2) {
+        const [groupName] = data.tileGroupNamesBuilder.get()
+        data.tileGroupBuilder = createIterBuilder(
+          getWorld().getAllTiles(groupName) as java.util.ArrayList<string>,
+        )
+        data.allTileGroupMap[groupName] = []
+        // to 3
+        data.stage1 = 3
+      }
+
+      // inner iter
+      if (data.stage1 === 3) {
+        const [groupName] = data.tileGroupNamesBuilder.get()
+        const [tileName] = data.tileGroupBuilder.get()
+        const tile = {
+          ...getTileInfoByName(tileName),
+          groupName,
+        }
+        if (tile.IsMoveAble && tile.texture && !tile.CanBreak) {
+          let tooltip = tile.displayName
+          if (tile.CanBreak) {
+            tooltip += `\nCanBreak: ${String(tile.CanBreak)}`
+          }
+          if (tile.PickUpWeight && tile.PickUpWeight !== '') {
+            tooltip += `\nWeight: ${String(tile.PickUpWeight)}`
+          }
+          if (tile.Capacity && tile.Capacity !== '') {
+            tooltip += `\nCapacity: ${String(tile.Capacity)}`
+          }
+          const it = {
+            name: tile.name,
+            item: tile,
+            tooltip,
+          }
+          data.allTiles.push(it)
+          data.allTileGroupMap[groupName].push(it)
+        }
+        // to 4
+        data.stage1 = 4
+      }
+
+      // inner iter check
+      if (data.stage1 === 4) {
+        const tileGroupIsEnd = data.tileGroupBuilder.inc()
+        if (tileGroupIsEnd) {
+          // inner iter end
+          // to 5
+          data.stage1 = 5
+        } else {
+          // to 3
+          data.stage1 = 3
+        }
+      }
+
+      // outer iter check
+      if (data.stage1 === 5) {
+        const tileGroupNamesIsEnd = data.tileGroupNamesBuilder.inc()
+        if (tileGroupNamesIsEnd) {
+          // outer iter end
+          // to 5
+          data.stage1 = 6
+        } else {
+          // to 2
+          data.stage1 = 2
+        }
+      }
+
+      if (data.stage1 === 6) {
+        // 删除没有有效贴图的分组
+        Object.keys(data.allTileGroupMap).forEach((groupName) => {
+          if (data.allTileGroupMap[groupName].length === 0) {
+            delete data.allTileGroupMap[groupName]
+          }
+        })
+        // task 执行完成
+        // all end
+        return true
+      }
+
+      throw `Wrong step stage`
+    },
+    // step(data) {
+    //   if (data.stage === Stage.tileGroupNamesIterating) {
+    //     const groupName = data.tileGroupNames.get(
+    //       data.tileGroupNamesIndex,
+    //     ) as string
+    //     data.tileGroup = getWorld().getAllTiles(
+    //       groupName,
+    //     ) as java.util.ArrayList<string>
+    //     data.allTileGroupMap[groupName] = []
+    //     data.tileGroupTotal = data.tileGroup.size()
+    //     data.tileGroupIndex = 0
+    //     data.stage = Stage.tileGroupIterating
+    //     return false
+    //   }
+
+    //   if (data.stage === Stage.tileGroupIterating) {
+    //     const tileName = data.tileGroup.get(data.tileGroupIndex)
+    //     const groupName = data.tileGroupNames.get(
+    //       data.tileGroupNamesIndex,
+    //     ) as string
+    //     const tile = {
+    //       ...getTileInfoByName(tileName),
+    //       groupName,
+    //     }
+    //     if (tile.IsMoveAble && tile.texture && !tile.CanBreak) {
+    //       let tooltip = tile.displayName
+    //       if (tile.CanBreak) {
+    //         tooltip += `\nCanBreak: ${String(tile.CanBreak)}`
+    //       }
+    //       if (tile.PickUpWeight && tile.PickUpWeight !== '') {
+    //         tooltip += `\nWeight: ${String(tile.PickUpWeight)}`
+    //       }
+    //       if (tile.Capacity && tile.Capacity !== '') {
+    //         tooltip += `\nCapacity: ${String(tile.Capacity)}`
+    //       }
+    //       const it = {
+    //         name: tile.name,
+    //         item: tile,
+    //         tooltip,
+    //       }
+    //       data.allTiles.push(it)
+    //       data.allTileGroupMap[groupName].push(it)
+    //     }
+    //     data.tileGroupIndex++
+    //     if (data.tileGroupIndex >= data.tileGroupTotal) {
+    //       data.tileGroupNamesIndex++
+    //       data.stage = Stage.tileGroupNamesIterating
+    //       if (data.tileGroupNamesIndex >= data.tileGroupNamesTotal) {
+    //         data.stage = Stage.tileGroupIteratingCheck
+    //       }
+    //     }
+    //     return false
+    //   }
+
+    //   if (data.stage === Stage.tileGroupIteratingCheck) {
+    //     // 删除没有有效贴图的分组
+    //     Object.keys(data.allTileGroupMap).forEach((groupName) => {
+    //       if (data.allTileGroupMap[groupName].length === 0) {
+    //         delete data.allTileGroupMap[groupName]
+    //       }
+    //     })
+    //     // task 执行完成
+    //     return true
+    //   }
+
+    //   throw `Wrong step stage`
+    // },
+    progress({ tileGroupNamesBuilder, tileGroupBuilder }) {
+      // 使用 divide 避免除 0 导致出问题
+      const [, tileGroupNamesIndex, , tileGroupNamesTotal] =
+        tileGroupNamesBuilder.get()
+      const [, tileGroupIndex, , tileGroupTotal] = tileGroupBuilder.get()
+      const baseProgress = divide(tileGroupNamesIndex, tileGroupNamesTotal)
+      const innerProgress = divide(tileGroupIndex, tileGroupTotal)
+      return baseProgress + innerProgress * divide(1, tileGroupNamesTotal)
+    },
+    // progress({
+    //   tileGroupNamesIndex,
+    //   tileGroupNamesTotal,
+    //   tileGroupIndex,
+    //   tileGroupTotal,
+    // }) {
+    //   // 使用 divide 避免除 0 导致出问题
+    //   const baseProgress = divide(tileGroupNamesIndex, tileGroupNamesTotal)
+    //   const innerProgress = divide(tileGroupIndex, tileGroupTotal)
+    //   return baseProgress + innerProgress * divide(1, tileGroupNamesTotal)
+    // },
+    finish(data) {
+      cb({
+        allTiles: data.allTiles,
+        allTileGroupMap: data.allTileGroupMap,
+      })
+    },
+    // error(err, data) {}
+  }
+  return task
+}
+
+// 原执行逻辑（在 ui 上执行的）
+
+// function Sakura_DMFurnitureGenerateUI.collectValidTextures()
+//     if #Sakura_DMFurnitureGenerateUI.allTiles > 0 then
+//         return
+//     end
+
+//     local allTiles = {}
+//     local allTileGroupMap = {}
+
+//     local tileGroupNames = getWorld():getAllTilesName()
+//     for i = 0, tileGroupNames:size() - 1, 1 do
+//         local groupName = tileGroupNames:get(i)
+//         local tileGroup = getWorld():getAllTiles(tileGroupNames:get(i))
+//         allTileGroupMap[groupName] = {}
+//         for i = 0, tileGroup:size() - 1, 1 do
+//             local tileName = tileGroup:get(i)
+//             local tile = SakuraBaseLib.getTileInfoByName(tileName)
+//             tile.groupName = groupName
+
+//             if tile.IsMoveAble and tile.texture and not tile.CanBreak then
+//                 local tooltip = tile.displayName
+//                 -- 多语言
+//                 if tile.CanBreak then
+//                     tooltip = tooltip .. '\n' .. 'CanBreak: ' .. tostring(tile.CanBreak)
+//                 end
+//                 if tile.PickUpWeight and tile.PickUpWeight ~= '' then
+//                     tooltip = tooltip .. '\n' .. 'Weight: ' .. tostring(tile.PickUpWeight)
+//                 end
+//                 if tile.Capacity and tile.Capacity ~= '' then
+//                     tooltip = tooltip .. '\n' .. 'Capacity: ' .. tostring(tile.Capacity)
+//                 end
+//                 local it = {
+//                     name = tile.name,
+//                     item = tile,
+//                     tooltip = tooltip,
+//                 }
+//                 table.insert(allTiles, it)
+//                 table.insert(allTileGroupMap[groupName], it)
+//             end
+//         end
+//     end
+
+//     for key, value in pairs(allTileGroupMap) do
+//         if #allTileGroupMap[key] == 0 then
+//             allTileGroupMap[key] = nil
+//         end
+//     end
+
+//     Sakura_DMFurnitureGenerateUI.allTiles = allTiles
+//     Sakura_DMFurnitureGenerateUI.allTileGroupMap = allTileGroupMap
+// end
+
+// Sakura_DMFurnitureGenerateUI.allTiles = {}
+// Sakura_DMFurnitureGenerateUI.allTileGroupMap = {}
