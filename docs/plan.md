@@ -16,6 +16,7 @@ Warning: Moveable not valid.
 tps 显示/计算可能有点问题，有时候会闪过几百
 历史执行的任务展示
 对外暴露的函数整理一下
+性能监测
 
 2. 物品数据转换
 3. tstl compiler，luaBundle 版本隔离
@@ -123,3 +124,13 @@ end)
 ```
 
 - ~~top class 换成 ISBaseObject？ISBaseObject 新增的内容怎么分享到 ts class~~（尝试实现的时候出了点问题，暂不实现）
+
+## others
+### 流程/想法
+[x] 先去构建b42的类型
+mallet 抽离 json to lua/ts 的部分
+java contents to json
+lua contents to json
+json to lua
+json to ts
+mallet-web

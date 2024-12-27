@@ -112,8 +112,10 @@ export interface LongTaskSchedulingContext {
   prevTaskTickStartTime: number
   /** 当前任务 tick 开始的时间 */
   currentTaskTickStartTime: number
-  /** 当前 tps */
+  /** 当前 tps（假） */
   tps: number
+  /** 当前 tps */
+  actualTps: number
   /** 当前 tick 的任务执行时间 */
   currentTickRemainingExecTime: number
   /** 剩余执行时间 */
@@ -353,6 +355,7 @@ export const createLongTaskSchedulingManager = () => {
     prevTaskTickStartTime: 0,
     currentTaskTickStartTime: 0,
     tps: 0,
+    actualTps: 0,
     currentTickRemainingExecTime: 0,
     remainingExecTime: 0,
     gamePaused: true,
@@ -433,7 +436,9 @@ export const createLongTaskSchedulingManager = () => {
     if (tickDuration <= 0) {
       return
     }
-    context.tps = Math.floor(1000 / tickDuration)
+    // TODO: 修复设为实际 tps 后，tps 会一路走低的问题
+    context.tps = 120
+    context.actualTps = Math.floor(1000 / (now - context.prevTaskTickStartTime))
     // 设置 tps 补偿时间
     context.currentTickRemainingExecTime = context.tpsCompensationTime
     context.tpsCompensationTime = 0

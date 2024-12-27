@@ -45,7 +45,8 @@ export const getTileInfoByName = (tileName: string) => {
   const ContainerCapacity = props.Val('ContainerCapacity')
   const FreezerCapacity = props.Val('FreezerCapacity')
   const customItem = props.Val('CustomItem')
-  const item = instanceItem(customItem || `Moveables.${tileName}`)
+  const itemId = customItem || `Moveables.${tileName}`
+  const item = instanceItem(itemId, 1)
   const displayName = item?.getDisplayName() || ''
   const Capacity = ContainerCapacity || FreezerCapacity || ''
   return {

@@ -303,7 +303,7 @@ export class TSUITaskSchedulingDebugPanel extends ISPanel {
     const taskQueue = this.taskManager.getTaskQueue()
     const managerContext = this.taskManager.getContext()
     this.taskCountLabel?.setName(`task count: ${taskQueue.length}`)
-    this.taskTpsLabel?.setName(`tps ${managerContext.tps}`)
+    this.taskTpsLabel?.setName(`tps ${managerContext.actualTps}`)
     this.taskGamePausedLabel?.setName(
       `gamePaused: ${managerContext.gamePaused}`,
     )
