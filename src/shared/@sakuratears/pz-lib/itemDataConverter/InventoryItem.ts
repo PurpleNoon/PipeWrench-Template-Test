@@ -3,7 +3,7 @@ import {
   Color,
   ImmutableColor,
   instanceItem,
-  type DrainableComboItem,
+  // type DrainableComboItem,
   type InventoryItem,
   type ItemVisual,
 } from '@asledgehammer/pipewrench'
@@ -160,17 +160,17 @@ export const baseItemToData = (
   data.registry_id = item.getRegistry_id()
   data.saveType = item.getSaveType()
   data.id = item.getID()
-  const isDrainableItem = (item: InventoryItem): item is DrainableComboItem =>
-    item.IsDrainable()
+  // const isDrainableItem = (item: InventoryItem): item is DrainableComboItem =>
+  //   item.IsDrainable()
   // print('isDrainable: ' + tostring(isDrainableItem(item)))
-  if (isDrainableItem(item)) {
-    const usedDelta = item.getUsedDelta()
-    // print('usedDelta: ' + tostring(usedDelta))
-    if (usedDelta < 1) {
-      data.isDrainable = true
-      data.usedDelta = usedDelta
-    }
-  }
+  // if (isDrainableItem(item)) {
+  //   const usedDelta = item.getUsedDelta()
+  //   // print('usedDelta: ' + tostring(usedDelta))
+  //   if (usedDelta < 1) {
+  //     data.isDrainable = true
+  //     data.usedDelta = usedDelta
+  //   }
+  // }
   const condition = item.getCondition()
   const conditionMax = item.getConditionMax()
   if (condition !== conditionMax) {
@@ -238,10 +238,10 @@ export const baseItemToData = (
   if (keyId !== -1) {
     data.keyId = keyId
   }
-  const isTaintedWater = item.isTaintedWater()
-  if (isTaintedWater) {
-    data.isTaintedWater = isTaintedWater
-  }
+  // const isTaintedWater = item.isTaintedWater()
+  // if (isTaintedWater) {
+  //   data.isTaintedWater = isTaintedWater
+  // }
   const remoteControlID = item.getRemoteControlID()
   const remoteRange = item.getRemoteRange()
   if (remoteControlID !== -1 || remoteRange !== 0) {
@@ -371,10 +371,10 @@ export const baseDataToItem = (
   const item = instanceItem(data.fullType)
 
   item.setID(data.id)
-  if (data.isDrainable && data.usedDelta) {
-    const drainableComboItem = item as DrainableComboItem
-    drainableComboItem.setUsedDelta(data.usedDelta)
-  }
+  // if (data.isDrainable && data.usedDelta) {
+  //   const drainableComboItem = item as DrainableComboItem
+  //   drainableComboItem.setUsedDelta(data.usedDelta)
+  // }
   if (data.condition) {
     item.setCondition(data.condition, false)
   }
@@ -419,9 +419,9 @@ export const baseDataToItem = (
   if (data.keyId) {
     item.setKeyId(data.keyId)
   }
-  if (data.isTaintedWater) {
-    item.setTaintedWater(data.isTaintedWater)
-  }
+  // if (data.isTaintedWater) {
+  //   item.setTaintedWater(data.isTaintedWater)
+  // }
   if (data.remoteControlID && data.remoteRange) {
     item.setRemoteControlID(data.remoteControlID)
     item.setRemoteRange(data.remoteRange)
