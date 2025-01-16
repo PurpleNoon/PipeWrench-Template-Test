@@ -76,8 +76,8 @@ importers:
         specifier: 5.5.2
         version: 5.5.2
       typescript-to-lua:
-        specifier: ^1.26.0
-        version: 1.28.1(typescript@5.5.2)
+        specifier: ^1.29.1
+        version: 1.29.1(typescript@5.5.2)
 
   packages/common-lib: {}
 
@@ -1637,8 +1637,8 @@ packages:
     resolution: {integrity: sha512-3KS2b+kL7fsuk/eJZ7EQdnEmQoaho/r6KUef7hxvltNA5DR8NAUM+8wJMbJyZ4G9/7i3v5zPBIMN5aybAh2/Jg==}
     engines: {node: '>= 0.4'}
 
-  typescript-to-lua@1.28.1:
-    resolution: {integrity: sha512-4Ah8bco9X7BNrDcVUHEDDWbZL2whoUg8CCLnUJWsoopmV43aDZuEqOlhtsWAjsH+3Wq5SugYcmyFRrZ+mWyCYw==}
+  typescript-to-lua@1.29.1:
+    resolution: {integrity: sha512-5/A/P9tIOEboGfPLg3XnyVkesHS9WxFfpW6Sq9BVXSCp/O5ucYY9psq5nv/oFd1Do+EbxmZvSPFFtlzfuiPJsg==}
     engines: {node: '>=16.10.0'}
     hasBin: true
     peerDependencies:
@@ -1739,7 +1739,7 @@ snapshots:
       picomatch: 2.3.1
       source-map: 0.7.4
       typescript: 5.5.2
-      typescript-to-lua: 1.28.1(typescript@5.5.2)
+      typescript-to-lua: 1.29.1(typescript@5.5.2)
 
   '@babel/code-frame@7.26.2':
     dependencies:
@@ -3401,7 +3401,7 @@ snapshots:
       possible-typed-array-names: 1.0.0
       reflect.getprototypeof: 1.0.8
 
-  typescript-to-lua@1.28.1(typescript@5.5.2):
+  typescript-to-lua@1.29.1(typescript@5.5.2):
     dependencies:
       '@typescript-to-lua/language-extensions': 1.19.0
       enhanced-resolve: 5.8.2
